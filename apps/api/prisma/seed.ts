@@ -1,6 +1,29 @@
 import { PrismaClient, SheetEntity, FieldType } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { ROLE_DEFAULTS, RoleName } from '@tridhata/shared';
+import path from 'path';
+import fs from 'fs';
+
+// Muat .env baik saat dijalankan dari root maupun dari apps/api
+const envPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '../../.env'),
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(__dirname, '../.env'),
+];
+
+for (const p of envPaths) {
+  if (fs.existsSync(p)) {
+    if (typeof process.loadEnvFile === 'function') {
+      try {
+        process.loadEnvFile(p);
+        break;
+      } catch {
+        // Lanjutkan mencoba path berikutnya
+      }
+    }
+  }
+}
 
 const prisma = new PrismaClient();
 

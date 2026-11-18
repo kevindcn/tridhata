@@ -1,3 +1,4 @@
+import './config/env'; // Wajib paling awal agar .env termuat sebelum modul lain di-require
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import helmet from '@fastify/helmet';

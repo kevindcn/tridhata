@@ -254,10 +254,10 @@ export const AppLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground antialiased">
-      {/* Desktop Sidebar (240px) */}
-      <aside className="hidden lg:flex w-60 flex-col border-r border-border bg-card shrink-0 select-none">
-        <div className="h-14 flex items-center px-4 border-b border-border">
+    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground antialiased">
+      {/* Desktop Sidebar (240px) - Sticky and pinned */}
+      <aside className="hidden lg:flex w-60 h-screen flex-col border-r border-border bg-card shrink-0 select-none sticky top-0">
+        <div className="h-14 shrink-0 flex items-center px-4 border-b border-border">
           <Link to={`/penjualan${location.search}`} className="flex items-center gap-2.5">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold text-xs shadow-xs">
               T
@@ -268,11 +268,11 @@ export const AppLayout: React.FC = () => {
           </Link>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="flex-1 overflow-y-auto px-3 py-4 scroll-smooth">
           {renderNavLinks()}
         </div>
 
-        <div className="p-3 border-t border-border">
+        <div className="shrink-0 p-3 border-t border-border">
           <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md bg-muted/40">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
               {user?.name ? user.name.slice(0, 2).toUpperCase() : 'U'}
@@ -286,9 +286,9 @@ export const AppLayout: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col min-w-0">
-        {/* Top Header (56px) */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/95 backdrop-blur-xs px-4 sm:px-6">
+      <div className="flex flex-1 flex-col h-screen min-w-0 overflow-hidden">
+        {/* Top Header (56px) - Sticky and pinned */}
+        <header className="sticky top-0 z-30 shrink-0 flex h-14 items-center justify-between border-b border-border bg-card/95 backdrop-blur-xs px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {/* Mobile Sheet Trigger */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -311,7 +311,7 @@ export const AppLayout: React.FC = () => {
                     Tridhata Ops
                   </SheetTitle>
                 </SheetHeader>
-                <div className="flex-1 overflow-y-auto py-4">
+                <div className="flex-1 overflow-y-auto py-4 scroll-smooth">
                   {renderNavLinks()}
                 </div>
               </SheetContent>
@@ -424,18 +424,8 @@ export const AppLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Global Stale Banner (SPEC 9.4 Poin 10) */}
-        {syncStatus?.stale && (
-          <div className="bg-warning-bg border-b border-warning/30 px-4 py-2 text-xs text-warning flex items-center justify-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
-            <span>
-              Data terakhir diperbarui {syncStatus.lastSuccessAt ? new Date(syncStatus.lastSuccessAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'belum pernah'}. Angka di bawah mungkin belum mencerminkan kondisi terbaru.
-            </span>
-          </div>
-        )}
-
-        {/* Page Content Outlet */}
-        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
+        {/* Page Content Outlet - Independent Smooth Scroll */}
+        <main className="flex-1 overflow-y-auto min-w-0 p-4 sm:p-6 lg:p-8 scroll-smooth focus:outline-none">
           <Outlet />
         </main>
       </div>

@@ -44,7 +44,8 @@ export async function api<T>(path: string, init: RequestInit = {}, canRetry = tr
     },
   });
 
-  if (res.status === 401 && canRetry && !path.startsWith('/auth/')) {
+  const isAuthRefreshOrLogin = path === '/auth/login' || path === '/auth/refresh';
+  if (res.status === 401 && canRetry && !isAuthRefreshOrLogin) {
     const t = await refreshAccessToken();
     if (t) {
       setAccessToken(t);

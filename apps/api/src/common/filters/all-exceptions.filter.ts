@@ -34,11 +34,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
           code = this.statusToCode(status);
         }
 
-        if (resObj.message) {
+        if (status === HttpStatus.TOO_MANY_REQUESTS) {
+          code = 'RATE_LIMITED';
+          message = 'Terlalu banyak percobaan masuk. Silakan tunggu beberapa saat sebelum mencoba kembali.';
+        } else if (resObj.message) {
           if (Array.isArray(resObj.message)) {
             message = resObj.message.join(', ');
           } else {
-            message = String(resObj.message);
+            const rawMsg = String(resObj.message);
+            message = rawMsg.includes('ThrottlerException')
+              ? 'Terlalu banyak percobaan masuk. Silakan tunggu beberapa saat sebelum mencoba kembali.'
+              : rawMsg;
           }
         } else {
           message = this.statusToMessage(status);

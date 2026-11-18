@@ -8,11 +8,13 @@ import { JwtStrategy } from './jwt.strategy';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET || 'fallback-secret-for-testing-purposes-min32',
-      signOptions: {
-        expiresIn: (process.env.JWT_ACCESS_TTL as never) || '15m',
-      },
+    JwtModule.registerAsync({
+      useFactory: () => ({
+        secret: process.env.JWT_ACCESS_SECRET || 'fallback-secret-for-testing-purposes-min32',
+        signOptions: {
+          expiresIn: (process.env.JWT_ACCESS_TTL as never) || '15m',
+        },
+      }),
     }),
   ],
   controllers: [AuthController],

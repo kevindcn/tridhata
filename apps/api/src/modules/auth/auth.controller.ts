@@ -30,7 +30,11 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 900000 } }) // 5 request per 15 menit
+  @Throttle(
+    process.env.NODE_ENV === 'production'
+      ? { default: { limit: 5, ttl: 900000 } }
+      : { default: { limit: 50, ttl: 60000 } },
+  )
   @Post('auth/login')
   @HttpCode(HttpStatus.OK)
   async login(
