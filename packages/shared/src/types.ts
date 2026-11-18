@@ -163,6 +163,7 @@ export interface SyncStatusResponse {
     finishedAt: string | null;
     rowsAccepted: number;
     rowsRejected: number;
+    report?: SyncReport | null;
   } | null;
   stale: boolean;
   staleAfterMinutes: number;

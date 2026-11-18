@@ -13,6 +13,8 @@ import {
   Menu,
   MapPin,
   CheckCircle,
+  AlertTriangle,
+  XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { api } from '@/lib/api-client';
@@ -41,7 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Permission } from '@tridhata/shared';
+import { Permission, SyncStatusResponse } from '@tridhata/shared';
 
 interface LocationItem {
   id: string;
@@ -124,12 +126,36 @@ const NAV_GROUPS: NavGroup[] = [
 export const AppLayout: React.FC = () => {
   const { user, logout, hasPermission } = useAuth();
   const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatusResponse | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
 
   const currentLocation = searchParams.get('lokasi');
+  const activeLocation = locations.find(
+    (l) => l.code.toLowerCase() === (currentLocation || '').toLowerCase(),
+  ) || locations[0];
+
+  useEffect(() => {
+    if (!activeLocation?.id) return;
+    let isMounted = true;
+
+    const poll = () => {
+      api<SyncStatusResponse>(`/sync/status?locationId=${activeLocation.id}`)
+        .then((res) => {
+          if (isMounted) setSyncStatus(res);
+        })
+        .catch(() => {});
+    };
+
+    poll();
+    const interval = setInterval(poll, 30000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeLocation?.id]);
 
   useEffect(() => {
     let isMounted = true;
@@ -324,9 +350,35 @@ export const AppLayout: React.FC = () => {
 
           <div className="flex items-center gap-3">
             {/* Sync Status Chip */}
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-muted/30 text-[11px] text-muted-foreground">
-              <CheckCircle className="h-3 w-3 text-status-safe" />
-              <span>Tersinkron</span>
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-muted/30 text-[11px]">
+              {syncStatus?.lastRun?.status === 'SUCCESS' ? (
+                <>
+                  <CheckCircle className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-muted-foreground">
+                    Tersinkron {syncStatus.lastSuccessAt ? new Date(syncStatus.lastSuccessAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </>
+              ) : syncStatus?.lastRun?.status === 'PARTIAL' ? (
+                <>
+                  <AlertTriangle className="h-3 w-3 text-amber-500" />
+                  <span className="text-amber-700 dark:text-amber-400">Sinkron Parsial</span>
+                </>
+              ) : syncStatus?.lastRun?.status === 'FAILED' ? (
+                <>
+                  <XCircle className="h-3 w-3 text-rose-500" />
+                  <span className="text-rose-700 dark:text-rose-400">Gagal Sinkron</span>
+                </>
+              ) : syncStatus?.lastRun?.status === 'RUNNING' ? (
+                <>
+                  <RefreshCw className="h-3 w-3 text-blue-500 animate-spin" />
+                  <span className="text-blue-700 dark:text-blue-400">Menyinkronkan...</span>
+                </>
+              ) : (
+                <>
+                  <div className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                  <span className="text-muted-foreground">Belum Sinkron</span>
+                </>
+              )}
             </div>
 
             {/* User Dropdown */}
@@ -371,6 +423,16 @@ export const AppLayout: React.FC = () => {
             </DropdownMenu>
           </div>
         </header>
+
+        {/* Global Stale Banner */}
+        {syncStatus?.stale && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>
+              Perhatian: Data Google Sheets belum tersinkron lebih dari 2 jam. Posisi stok dan metrik mungkin belum mutakhir.
+            </span>
+          </div>
+        )}
 
         {/* Page Content Outlet */}
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto">

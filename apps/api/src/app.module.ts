@@ -6,6 +6,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { LocationsModule } from './modules/locations/locations.module';
 import { UsersModule } from './modules/users/users.module';
+import { SheetsSyncModule } from './modules/sheets-sync/sheets-sync.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -46,6 +48,8 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     AuditModule,
     LocationsModule,
     UsersModule,
+    SheetsSyncModule,
+    DashboardModule,
     AuthModule,
     HealthModule,
   ],
