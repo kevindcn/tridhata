@@ -14,6 +14,50 @@ export interface AuthUser {
   mustChangePassword: boolean;
 }
 
+export interface UserResponse {
+  id: string;
+  name: string;
+  email: string;
+  role: RoleName;
+  division: string | null;
+  active: boolean;
+  mustChangePassword: boolean;
+  defaultLocationId: string | null;
+  locations: Array<{ id: string; code: string; name: string }>;
+  extraPermissions: Permission[];
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateUserResponse {
+  user: UserResponse;
+  temporaryPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  temporaryPassword: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  actorId: string | null;
+  actorName: string | null;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogResponse {
+  items: AuditLogItem[];
+  nextCursor: string | null;
+}
+
 export interface ReqCtx {
   ip?: string;
   userAgent?: string;

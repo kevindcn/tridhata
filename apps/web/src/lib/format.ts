@@ -23,3 +23,17 @@ export const formatRupiah = (n: number): string => normalizeSpaces(rupiah.format
 export const formatRupiahCompact = (n: number): string => normalizeSpaces(rupiahCompact.format(n));
 
 export const formatPct = (n: number | null): string => (n === null ? '–' : `${Math.round(n)}%`);
+
+export const formatDateTime = (date: string | Date): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(d);
+};

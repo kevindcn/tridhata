@@ -35,7 +35,8 @@ export const createUserSchema = z.object({
     .default([]),
 });
 
-export type CreateUserDto = z.infer<typeof createUserSchema>;
+export type CreateUserDto = z.input<typeof createUserSchema>;
+export type CreateUserParsed = z.infer<typeof createUserSchema>;
 
 export const updateUserSchema = createUserSchema
   .partial()
@@ -43,4 +44,5 @@ export const updateUserSchema = createUserSchema
     active: z.boolean().optional(),
   });
 
-export type UpdateUserDto = z.infer<typeof updateUserSchema>;
+export type UpdateUserDto = z.input<typeof updateUserSchema>;
+export type UpdateUserParsed = z.infer<typeof updateUserSchema>;
