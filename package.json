@@ -1,0 +1,39 @@
+{
+  "name": "tridhata-ops-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.5.2",
+  "scripts": {
+    "dev:api": "pnpm --filter api run dev",
+    "dev:web": "pnpm --filter web run dev",
+    "build:shared": "pnpm --filter shared run build",
+    "build:api": "pnpm --filter api run build",
+    "build:web": "pnpm --filter web run build",
+    "build": "pnpm build:shared && pnpm build:api && pnpm build:web",
+    "lint": "eslint \"{apps,packages}/**/*.{ts,tsx}\"",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "db:migrate": "pnpm --filter api run db:migrate",
+    "db:seed": "pnpm --filter api run db:seed",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "@types/node": "^22.13.9",
+    "eslint": "^9.21.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "esbuild",
+      "prisma"
+    ]
+  }
+}

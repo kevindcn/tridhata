@@ -1,0 +1,9 @@
+app.klien.com {
+  encode zstd gzip
+  reverse_proxy tridhata-web:80
+}
+
+api.klien.com {
+  encode zstd gzip
+  reverse_proxy tridhata-api:3000
+}

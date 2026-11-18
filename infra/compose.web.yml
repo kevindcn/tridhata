@@ -1,0 +1,11 @@
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args: { VITE_API_URL: https://api.klien.com }
+    container_name: tridhata-web
+    restart: unless-stopped
+    environment: { API_ORIGIN: https://api.klien.com }
+    networks: [edge]
+networks: { edge: { external: true } }

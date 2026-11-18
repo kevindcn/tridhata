@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SheetEntity {
+  PRODUCT
+  STOCK
+  SALE
+  FORECAST
+  TARGET
+}
+
+enum FieldType {
+  STRING
+  INT
+  DECIMAL
+  DATE
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Decision {
+  APPROVED
+  REJECTED
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL
+  FAILED
+}
+
+enum SyncTrigger {
+  CRON
+  MANUAL
+}
+
+model Location {
+  id            String           @id @default(uuid()) @db.Uuid
+  code          String           @unique // BOGOR, NGANJUK
+  name          String
+  spreadsheetId String? // diisi dari env saat seed
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  users         User[]           @relation("DefaultLocation")
+  access        LocationAccess[]
+
+  @@map("lokasi")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique // ADMIN | FINANCE | STAFF
+  permissions String[] // salinan ROLE_DEFAULTS saat seed
+  users       User[]
+
+  @@map("peran")
+}
+
+model User {
+  id                 String           @id @default(uuid()) @db.Uuid
+  name               String
+  email              String           @unique
+  passwordHash       String
+  division           String?
+  roleId             String           @db.Uuid
+  role               Role             @relation(fields: [roleId], references: [id])
+  defaultLocationId  String?          @db.Uuid
+  defaultLocation    Location?        @relation("DefaultLocation", fields: [defaultLocationId], references: [id])
+  extraPermissions   String[]         @default([])
+  active             Boolean          @default(true)
+  mustChangePassword Boolean          @default(true)
+  failedLogins       Int              @default(0)
+  lockedUntil        DateTime?
+  lastLoginAt        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  access             LocationAccess[]
+  refreshTokens      RefreshToken[]
+  requests           Request[]
+  approvals          Approval[]
+  audits             AuditLog[]
+
+  @@map("pengguna")
+}
+
+model LocationAccess {
+  userId     String   @db.Uuid
+  locationId String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, locationId])
+  @@map("akses_lokasi")
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId     String    @db.Uuid // satu rantai rotasi
+  tokenHash    String    @unique // sha256 dari token mentah
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?   @db.Uuid
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_token")
+}
+
+model Product {
+  id        String             @id @default(uuid()) @db.Uuid
+  sku       String             @unique
+  name      String
+  unit      String             @default("pcs")
+  price     Decimal            @default(0) @db.Decimal(18, 2) // harga jual
+  cost      Decimal            @default(0) @db.Decimal(18, 2) // HPP
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  stock     StockLevel[]
+  sales     Sale[]
+  forecasts Forecast[]
+  targets   ProductionTarget[]
+
+  @@map("produk")
+}
+
+model StockLevel {
+  id          String   @id @default(uuid()) @db.Uuid
+  productId   String   @db.Uuid
+  locationId  String   @db.Uuid
+  product     Product  @relation(fields: [productId], references: [id])
+  qty         Int      @default(0)
+  minStock    Int      @default(0)
+  safetyStock Int      @default(0)
+  syncedAt    DateTime @default(now())
+  version     Int      @default(1) // disiapkan untuk Opsi 2
+
+  @@unique([productId, locationId])
+  @@index([locationId])
+  @@map("stok_produk")
+}
+
+model Sale {
+  id         String   @id @default(uuid()) @db.Uuid
+  locationId String   @db.Uuid
+  productId  String   @db.Uuid
+  product    Product  @relation(fields: [productId], references: [id])
+  date       DateTime @db.Date
+  docNo      String?
+  qty        Int
+  price      Decimal  @db.Decimal(18, 2)
+  total      Decimal  @db.Decimal(18, 2)
+  sourceKey  String // gabungan field isKey dari sheet
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([locationId, sourceKey])
+  @@index([locationId, date])
+  @@index([productId])
+  @@map("penjualan")
+}
+
+model Forecast {
+  id         String  @id @default(uuid()) @db.Uuid
+  productId  String  @db.Uuid
+  locationId String  @db.Uuid
+  product    Product @relation(fields: [productId], references: [id])
+  period     String // 'YYYY-MM'
+  qty        Int
+
+  @@unique([productId, locationId, period])
+  @@index([locationId, period])
+  @@map("forecast")
+}
+
+model ProductionTarget {
+  id         String  @id @default(uuid()) @db.Uuid
+  productId  String  @db.Uuid
+  locationId String  @db.Uuid
+  product    Product @relation(fields: [productId], references: [id])
+  period     String
+  targetQty  Int
+  actualQty  Int     @default(0)
+
+  @@unique([productId, locationId, period])
+  @@index([locationId, period])
+  @@map("target_produksi")
+}
+
+model Request {
+  id          String        @id @default(uuid()) @db.Uuid
+  requesterId String        @db.Uuid
+  requester   User          @relation(fields: [requesterId], references: [id])
+  locationId  String        @db.Uuid
+  type        String
+  title       String
+  note        String?
+  amount      Decimal       @db.Decimal(18, 2)
+  status      RequestStatus @default(PENDING)
+  version     Int           @default(1)
+  decidedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  approvals   Approval[]
+
+  @@index([status, createdAt])
+  @@index([requesterId])
+  @@map("pengajuan")
+}
+
+model Approval {
+  id         String   @id @default(uuid()) @db.Uuid
+  requestId  String   @db.Uuid
+  request    Request  @relation(fields: [requestId], references: [id])
+  approverId String   @db.Uuid
+  approver   User     @relation(fields: [approverId], references: [id])
+  level      Int      @default(1) // disiapkan untuk berjenjang (Opsi 2)
+  decision   Decision
+  note       String?
+  decidedAt  DateTime @default(now())
+
+  @@index([requestId])
+  @@map("approval")
+}
+
+model SheetMapping {
+  id           String      @id @default(uuid()) @db.Uuid
+  locationId   String      @db.Uuid
+  tab          String // nama tab di spreadsheet
+  entity       SheetEntity
+  sourceHeader String // teks header di sheet
+  targetField  String // field tujuan (bagian 7.2)
+  fieldType    FieldType
+  required     Boolean     @default(true)
+  isKey        Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([locationId, entity, targetField])
+  @@map("sheet_mapping")
+}
+
+model SyncRun {
+  id            String      @id @default(uuid()) @db.Uuid
+  locationId    String      @db.Uuid
+  trigger       SyncTrigger
+  triggeredById String?     @db.Uuid
+  status        SyncStatus
+  startedAt     DateTime    @default(now())
+  finishedAt    DateTime?
+  rowsAccepted  Int         @default(0)
+  rowsRejected  Int         @default(0)
+  report        Json? // bagian 7.5
+
+  @@index([locationId, startedAt])
+  @@map("sync_run")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_log")
+}
