@@ -73,7 +73,7 @@ export const ChangePasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center p-4 bg-[#F5F5F7]">
+    <div className="flex min-h-screen w-full items-center justify-center p-4 bg-background">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary mb-2">

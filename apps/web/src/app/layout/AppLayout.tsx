@@ -227,11 +227,11 @@ export const AppLayout: React.FC = () => {
                       'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
                       isActive
                         ? 'bg-accent text-accent-foreground font-medium'
-                        : 'text-foreground/80 hover:bg-[#F5F5F7] hover:text-foreground',
+                        : 'text-foreground/80 hover:bg-muted hover:text-foreground',
                     )
                   }
                 >
-                  <Icon className="h-4 w-4 shrink-0 text-inherit stroke-[1.75]" />
+                  <Icon className="h-4 w-4 shrink-0 text-inherit" />
                   <span>{item.label}</span>
                 </NavLink>
               );
@@ -350,28 +350,28 @@ export const AppLayout: React.FC = () => {
 
           <div className="flex items-center gap-3">
             {/* Sync Status Chip */}
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-muted/30 text-[11px]">
+            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-muted/40 text-[11px]">
               {syncStatus?.lastRun?.status === 'SUCCESS' ? (
                 <>
-                  <CheckCircle className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  <CheckCircle className="h-3 w-3 text-status-safe" />
                   <span className="text-muted-foreground">
                     Tersinkron {syncStatus.lastSuccessAt ? new Date(syncStatus.lastSuccessAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
                 </>
               ) : syncStatus?.lastRun?.status === 'PARTIAL' ? (
                 <>
-                  <AlertTriangle className="h-3 w-3 text-amber-500" />
-                  <span className="text-amber-700 dark:text-amber-400">Sinkron Parsial</span>
+                  <AlertTriangle className="h-3 w-3 text-warning" />
+                  <span className="text-warning">Sinkron Parsial</span>
                 </>
               ) : syncStatus?.lastRun?.status === 'FAILED' ? (
                 <>
-                  <XCircle className="h-3 w-3 text-rose-500" />
-                  <span className="text-rose-700 dark:text-rose-400">Gagal Sinkron</span>
+                  <XCircle className="h-3 w-3 text-status-critical" />
+                  <span className="text-status-critical">Sinkron Gagal</span>
                 </>
               ) : syncStatus?.lastRun?.status === 'RUNNING' ? (
                 <>
-                  <RefreshCw className="h-3 w-3 text-blue-500 animate-spin" />
-                  <span className="text-blue-700 dark:text-blue-400">Menyinkronkan...</span>
+                  <RefreshCw className="h-3 w-3 text-primary animate-spin" />
+                  <span className="text-primary">Menyinkronkan...</span>
                 </>
               ) : (
                 <>
@@ -424,12 +424,12 @@ export const AppLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Global Stale Banner */}
+        {/* Global Stale Banner (SPEC 9.4 Poin 10) */}
         {syncStatus?.stale && (
-          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-center gap-2">
-            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="bg-warning-bg border-b border-warning/30 px-4 py-2 text-xs text-warning flex items-center justify-center gap-2">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warning" />
             <span>
-              Perhatian: Data Google Sheets belum tersinkron lebih dari 2 jam. Posisi stok dan metrik mungkin belum mutakhir.
+              Data terakhir diperbarui {syncStatus.lastSuccessAt ? new Date(syncStatus.lastSuccessAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : 'belum pernah'}. Angka di bawah mungkin belum mencerminkan kondisi terbaru.
             </span>
           </div>
         )}

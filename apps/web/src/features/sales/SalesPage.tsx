@@ -9,6 +9,8 @@ import {
   Layers,
   ArrowUpRight,
   RefreshCw,
+  AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -20,11 +22,12 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { api } from '@/lib/api-client';
-import { formatInt, formatRupiah, formatPct } from '@/lib/format';
+import { formatInt, formatRupiah, formatPct, formatDateTime } from '@/lib/format';
 import { downloadCsv } from '@/lib/download';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -48,6 +51,7 @@ export const SalesPage: React.FC = () => {
 
   const [locationId, setLocationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [data, setData] = useState<SalesDashboard | null>(null);
 
@@ -71,8 +75,9 @@ export const SalesPage: React.FC = () => {
           setLocationId(found.id);
         }
       })
-      .catch((err) => {
-        toast.error('Gagal memuat data lokasi: ' + err.message);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Gagal memuat data lokasi';
+        toast.error(msg);
       });
   }, [lokasiParam]);
 
@@ -80,12 +85,15 @@ export const SalesPage: React.FC = () => {
   const fetchData = () => {
     if (!locationId) return;
     setLoading(true);
+    setError(null);
     api<SalesDashboard>(`/dashboard/sales?locationId=${locationId}&from=${from}&to=${to}`)
       .then((res) => {
         setData(res);
       })
-      .catch((err) => {
-        toast.error('Gagal memuat ringkasan penjualan: ' + err.message);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Data penjualan gagal dimuat. Periksa koneksi, lalu coba lagi.';
+        setError(msg);
+        toast.error(msg);
       })
       .finally(() => {
         setLoading(false);
@@ -138,42 +146,34 @@ export const SalesPage: React.FC = () => {
   const getStatusBadge = (status: StockStatus) => {
     switch (status) {
       case 'SAFE':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
-            Aman
-          </span>
-        );
+        return <Badge variant="safe">Aman</Badge>;
       case 'MINIMUM':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800">
-            Minimal
-          </span>
-        );
+        return <Badge variant="minimum">Minimal</Badge>;
       case 'CRITICAL':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-800">
-            Kritis
-          </span>
-        );
+        return <Badge variant="critical">Kritis</Badge>;
       case 'EMPTY':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800">
-            Habis
-          </span>
-        );
+        return <Badge variant="empty">Habis</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  // SPEC 9.6: Financial cards are rendered only if cards.revenue !== null
+  const hasFinanceAccess = data?.cards.revenue !== null && data?.cards.revenue !== undefined;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Header and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Ringkasan Penjualan — Pabrik {lokasiParam}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Ringkasan Penjualan — Pabrik {lokasiParam}
+            </h1>
+            <span className="text-xs text-muted-foreground font-mono tabular-nums">
+              {from} s.d. {to}
+            </span>
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Performa penjualan riil, perbandingan target proporsional, dan proyeksi akhir bulan.
           </p>
@@ -185,7 +185,7 @@ export const SalesPage: React.FC = () => {
             size="sm"
             onClick={fetchData}
             disabled={loading}
-            className="h-8 text-xs"
+            className="h-8 text-xs min-h-[36px] sm:min-h-[32px]"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Segarkan
@@ -196,7 +196,7 @@ export const SalesPage: React.FC = () => {
             size="sm"
             onClick={handleExport}
             disabled={exporting || loading}
-            className="h-8 text-xs"
+            className="h-8 text-xs min-h-[36px] sm:min-h-[32px]"
           >
             <Download className="h-3.5 w-3.5 mr-1.5" />
             {exporting ? 'Mengunduh...' : 'Unduh CSV'}
@@ -204,25 +204,25 @@ export const SalesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stale Warning Banner */}
+      {/* Stale Warning Banner (SPEC 9.4 Poin 10) */}
       {data?.meta.stale && (
-        <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-amber-800 dark:text-amber-300 text-xs">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="flex items-center gap-2 p-3 bg-warning-bg border border-warning/30 rounded-md text-warning text-xs">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
           <span>
-            Peringatan: Data sinkronisasi belum diperbarui lebih dari 2 jam. Angka di bawah mungkin belum mencerminkan data spreadsheet terbaru.
+            Data terakhir diperbarui {data.meta.lastSuccessAt ? formatDateTime(data.meta.lastSuccessAt) : 'belum pernah'}. Angka di bawah mungkin belum mencerminkan kondisi terbaru.
           </span>
         </div>
       )}
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-card border border-border rounded-lg shadow-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground mr-1">Periode:</span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-card border border-border rounded-lg shadow-xs">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <span className="text-xs font-medium text-muted-foreground mr-1 shrink-0">Periode:</span>
           <Button
             variant={activePreset === 'this-month' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => handlePreset('this-month')}
-            className="h-7 text-xs px-2.5"
+            className="h-7 text-xs px-2.5 shrink-0"
           >
             Bulan Ini
           </Button>
@@ -230,7 +230,7 @@ export const SalesPage: React.FC = () => {
             variant={activePreset === 'last-month' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => handlePreset('last-month')}
-            className="h-7 text-xs px-2.5"
+            className="h-7 text-xs px-2.5 shrink-0"
           >
             Bulan Lalu
           </Button>
@@ -238,14 +238,14 @@ export const SalesPage: React.FC = () => {
             variant={activePreset === 'last-30' ? 'default' : 'ghost'}
             size="sm"
             onClick={() => handlePreset('last-30')}
-            className="h-7 text-xs px-2.5"
+            className="h-7 text-xs px-2.5 shrink-0"
           >
             30 Hari
           </Button>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+          <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
           <input
             type="date"
             value={from}
@@ -253,7 +253,7 @@ export const SalesPage: React.FC = () => {
               setFrom(e.target.value);
               setActivePreset('custom');
             }}
-            className="h-7 px-2 border border-input rounded bg-background text-foreground text-xs"
+            className="h-8 px-2 border border-input rounded bg-background text-foreground text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <span className="text-muted-foreground">s.d.</span>
           <input
@@ -263,111 +263,155 @@ export const SalesPage: React.FC = () => {
               setTo(e.target.value);
               setActivePreset('custom');
             }}
-            className="h-7 px-2 border border-input rounded bg-background text-foreground text-xs"
+            className="h-8 px-2 border border-input rounded bg-background text-foreground text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Omzet s.d. Hari Ini */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Omzet s.d. Hari Ini
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-xl font-bold tracking-tight text-foreground tabular-nums">
-              {data?.cards.revenue !== null && data?.cards.revenue !== undefined
-                ? formatRupiah(data.cards.revenue)
-                : '—'}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {data?.cards.previousMonthRevenue !== null && data?.cards.previousMonthRevenue !== undefined ? (
-                <span>Bulan lalu: {formatRupiah(data.cards.previousMonthRevenue)}</span>
-              ) : (
-                'Hanya staf dengan hak akses finansial'
-              )}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Error State with Retry Button (SPEC 9.4 Poin 9) */}
+      {error && !loading && (
+        <div className="p-8 text-center rounded-lg border border-destructive/20 bg-destructive/10 text-destructive shadow-xs">
+          <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-destructive/10 text-destructive mb-3">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium">{error}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={fetchData}
+          >
+            Coba Lagi
+          </Button>
+        </div>
+      )}
 
-        {/* Qty Terjual & Capaian */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Qty Terjual & Capaian
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xl font-bold tracking-tight text-foreground tabular-nums">
-                {data ? formatInt(data.cards.soldQty) : '0'} Pcs
-              </span>
-              {data?.cards.soldVsForecastPct !== null && data?.cards.soldVsForecastPct !== undefined && (
-                <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+      {/* KPI Cards Grid (SPEC 9.6: Five StatCards, financial omitted when null) */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+        </div>
+      ) : data ? (
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${hasFinanceAccess ? 'lg:grid-cols-3 xl:grid-cols-5' : 'lg:grid-cols-3'} gap-4`}>
+          {/* 1. Omzet s.d. Hari Ini (Only if finance:read per SPEC 9.6) */}
+          {hasFinanceAccess && (
+            <Card className="shadow-xs">
+              <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Omzet s.d. Hari Ini
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="text-xl font-bold tracking-tight text-foreground tabular-nums">
+                  {formatRupiah(data.cards.revenue || 0)}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {data.cards.previousMonthRevenue !== null && data.cards.previousMonthRevenue !== undefined ? (
+                    <span>Bulan lalu: {formatRupiah(data.cards.previousMonthRevenue)}</span>
+                  ) : (
+                    'Data bulan lalu tidak tersedia'
+                  )}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 2. Terjual vs Forecast (SPEC 9.6: Terjual vs forecast, nilai persen, subteks X dari Y pcs) */}
+          <Card className="shadow-xs">
+            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Terjual vs Forecast
+              </CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold tracking-tight text-foreground tabular-nums">
                   {formatPct(data.cards.soldVsForecastPct)}
                 </span>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Target proporsional: {data ? formatInt(data.cards.forecastQty) : '0'} Pcs
-            </p>
-          </CardContent>
-        </Card>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  ({formatInt(data.cards.soldQty)} Pcs)
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                {formatInt(data.cards.soldQty)} dari {formatInt(data.cards.forecastQty)} pcs target proporsional
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* Proyeksi Akhir Bulan */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Proyeksi Akhir Bulan
-            </CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="text-xl font-bold tracking-tight text-foreground tabular-nums">
-              {data?.cards.projectedMonthEndQty !== null && data?.cards.projectedMonthEndQty !== undefined
-                ? `${formatInt(data.cards.projectedMonthEndQty)} Pcs`
-                : '0 Pcs'}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Estimasi berbasis laju {data?.meta.daysElapsed || 1} dari {data?.meta.daysInMonth || 30} hari
-            </p>
-          </CardContent>
-        </Card>
+          {/* 3. Proyeksi Akhir Bulan (SPEC 9.6) */}
+          <Card className="shadow-xs">
+            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Proyeksi Akhir Bulan
+              </CardTitle>
+              <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="text-xl font-bold tracking-tight text-foreground tabular-nums">
+                {data.cards.projectedMonthEndQty !== null && data.cards.projectedMonthEndQty !== undefined
+                  ? `${formatInt(data.cards.projectedMonthEndQty)} Pcs`
+                  : '0 Pcs'}
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Laju {data.meta.daysElapsed || 1} dari {data.meta.daysInMonth || 30} hari berjalan
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* Estimasi Defisit & Nilai Stok */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Defisit Stok & Nilai
-            </CardTitle>
-            <Layers className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-4 pt-0">
-            <div className="flex items-baseline gap-2">
-              <span className={`text-xl font-bold tracking-tight tabular-nums ${
-                (data?.cards.shortageSkuCount || 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'
-              }`}>
-                {data ? formatInt(data.cards.shortageSkuCount) : '0'} SKU
-              </span>
-              <span className="text-xs text-muted-foreground">
-                ({data ? formatInt(data.cards.stockShortageQty || 0) : '0'} Pcs)
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Nilai stok: {data?.cards.stockValue !== null && data?.cards.stockValue !== undefined
-                ? formatRupiah(data.cards.stockValue)
-                : '—'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          {/* 4. Kekurangan Stok s.d. Akhir Bulan (SPEC 9.6: X SKU kurang · Y SKU habis) */}
+          <Card className="shadow-xs">
+            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-xs font-medium text-muted-foreground">
+                Kekurangan Stok
+              </CardTitle>
+              <Layers className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="flex items-baseline gap-2">
+                <span className={`text-xl font-bold tracking-tight tabular-nums ${
+                  data.cards.shortageSkuCount > 0 ? 'text-status-critical' : 'text-foreground'
+                }`}>
+                  {formatInt(data.cards.shortageSkuCount)} SKU
+                </span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  ({formatInt(data.cards.stockShortageQty || 0)} Pcs)
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                {data.cards.shortageSkuCount} SKU kurang · {data.cards.emptySkuCount} SKU sudah habis
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Daily Sales Chart */}
+          {/* 5. Nilai Stok Produk Jadi (Only if finance:read per SPEC 9.6) */}
+          {hasFinanceAccess && (
+            <Card className="shadow-xs">
+              <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-xs font-medium text-muted-foreground">
+                  Nilai Stok Produk Jadi
+                </CardTitle>
+                <Layers className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="text-xl font-bold tracking-tight text-foreground tabular-nums">
+                  {formatRupiah(data.cards.stockValue || 0)}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                  {data.cards.criticalSkuCount} kritis · {data.cards.emptySkuCount} habis
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      ) : null}
+
+      {/* Daily Sales Chart (SPEC 9.4 Poin 1 & 9.6: Satu seri, tanpa gradien, tanpa 3D) */}
       <Card className="shadow-xs">
         <CardHeader className="p-4 pb-2">
           <CardTitle className="text-sm font-semibold text-foreground">
@@ -376,21 +420,17 @@ export const SalesPage: React.FC = () => {
         </CardHeader>
         <CardContent className="p-4 pt-2">
           <div className="h-64 w-full">
-            {data?.daily && data.daily.length > 0 ? (
+            {loading ? (
+              <Skeleton className="h-full w-full rounded-md" />
+            ) : data?.daily && data.daily.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data.daily} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="qtyGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-border/60" />
                   <XAxis
                     dataKey="date"
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => v.slice(8, 10)}
+                    tickFormatter={(v: string) => v.slice(8, 10)}
                     className="text-[11px] text-muted-foreground"
                   />
                   <YAxis
@@ -402,7 +442,7 @@ export const SalesPage: React.FC = () => {
                     contentStyle={{
                       backgroundColor: 'var(--card)',
                       borderColor: 'var(--border)',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       fontSize: '12px',
                     }}
                     formatter={(val) => [`${formatInt(Number(val))} Pcs`, 'Kuantitas']}
@@ -411,16 +451,16 @@ export const SalesPage: React.FC = () => {
                   <Area
                     type="monotone"
                     dataKey="qty"
-                    stroke="#3b82f6"
+                    stroke="var(--primary)"
                     strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#qtyGradient)"
+                    fill="var(--accent)"
+                    fillOpacity={0.4}
                   />
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                Tidak ada data transaksi pada rentang tanggal ini.
+                Belum ada penjualan pada rentang ini. Ubah rentang tanggal atau periksa sinkron terakhir.
               </div>
             )}
           </div>
@@ -449,15 +489,29 @@ export const SalesPage: React.FC = () => {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
-                    Memuat data performa produk...
-                  </TableCell>
-                </TableRow>
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                      <TableCell className="text-center"><Skeleton className="h-5 w-16 mx-auto" /></TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ) : !data?.products.length ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-xs text-muted-foreground">
-                    Tidak ada produk ditemukan untuk lokasi ini.
+                  <TableCell colSpan={7} className="text-center py-12">
+                    <FileSpreadsheet className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-foreground">
+                      Belum ada penjualan pada rentang ini.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Ubah rentang tanggal atau periksa jadwal sinkronisasi terakhir.
+                    </p>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -477,7 +531,7 @@ export const SalesPage: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums font-medium">
                       {item.pct !== null ? (
-                        <span className={item.pct >= 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground'}>
+                        <span className={item.pct >= 100 ? 'text-status-safe font-semibold' : 'text-foreground'}>
                           {formatPct(item.pct)}
                         </span>
                       ) : (

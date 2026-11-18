@@ -242,54 +242,56 @@ export const AuditLogPage: React.FC = () => {
           </div>
         ) : (
           <div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[180px]">Waktu (WIB)</TableHead>
-                  <TableHead className="w-[200px]">Pelaku</TableHead>
-                  <TableHead className="w-[160px]">Aksi</TableHead>
-                  <TableHead className="w-[140px]">Entitas</TableHead>
-                  <TableHead>Alamat IP</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((log) => (
-                  <TableRow
-                    key={log.id}
-                    onClick={() => handleRowClick(log)}
-                    className="cursor-pointer"
-                  >
-                    <TableCell className="text-xs font-mono tabular-nums text-muted-foreground">
-                      {formatDateTime(log.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium text-xs text-foreground">
-                          {log.actorName || 'Sistem'}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {log.actorId ? log.actorId.slice(0, 8) + '...' : '-'}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={getActionBadgeVariant(log.action)}
-                        className="text-[11px] font-mono"
-                      >
-                        {log.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground font-mono">
-                      {log.entity} {log.entityId ? `(${log.entityId.slice(0, 8)})` : ''}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground font-mono">
-                      {log.ip || '-'}
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[180px]">Waktu (WIB)</TableHead>
+                    <TableHead className="w-[200px]">Pelaku</TableHead>
+                    <TableHead className="w-[160px]">Aksi</TableHead>
+                    <TableHead className="w-[140px]">Entitas</TableHead>
+                    <TableHead>Alamat IP</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {logs.map((log) => (
+                    <TableRow
+                      key={log.id}
+                      onClick={() => handleRowClick(log)}
+                      className="cursor-pointer"
+                    >
+                      <TableCell className="text-xs font-mono tabular-nums text-muted-foreground">
+                        {formatDateTime(log.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-xs text-foreground">
+                            {log.actorName || 'Sistem'}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {log.actorId ? log.actorId.slice(0, 8) + '...' : '-'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={getActionBadgeVariant(log.action)}
+                          className="text-[11px] font-mono"
+                        >
+                          {log.action}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono">
+                        {log.entity} {log.entityId ? `(${log.entityId.slice(0, 8)})` : ''}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono">
+                        {log.ip || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
 
             {nextCursor && (
               <div className="p-4 border-t border-border flex justify-center bg-muted/20">

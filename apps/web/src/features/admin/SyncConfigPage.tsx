@@ -9,12 +9,15 @@ import {
   Clock,
   Edit2,
   Save,
+  AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { formatInt, formatDateTime } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -55,6 +58,7 @@ export const SyncConfigPage: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatusResponse | null>(null);
   const [mappings, setMappings] = useState<SheetMappingDto[]>([]);
   const [mappingsLoading, setMappingsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Edit Mapping Modal State
   const [editingMapping, setEditingMapping] = useState<SheetMappingDto | null>(null);
@@ -71,8 +75,9 @@ export const SyncConfigPage: React.FC = () => {
           setLocationId(found.id);
         }
       })
-      .catch((err) => {
-        toast.error('Gagal memuat data lokasi: ' + err.message);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Gagal memuat data lokasi';
+        toast.error(msg);
       });
   }, [lokasiParam]);
 
@@ -80,12 +85,15 @@ export const SyncConfigPage: React.FC = () => {
   const loadStatus = () => {
     if (!locationId) return;
     setStatusLoading(true);
+    setError(null);
     api<SyncStatusResponse>(`/sync/status?locationId=${locationId}`)
       .then((res) => {
         setSyncStatus(res);
       })
-      .catch((err) => {
-        toast.error('Gagal memuat status sinkronisasi: ' + err.message);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Gagal memuat status sinkronisasi';
+        setError(msg);
+        toast.error(msg);
       })
       .finally(() => {
         setStatusLoading(false);
@@ -99,8 +107,9 @@ export const SyncConfigPage: React.FC = () => {
       .then((res) => {
         setMappings(res);
       })
-      .catch((err) => {
-        toast.error('Gagal memuat konfigurasi pemetaan: ' + err.message);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Gagal memuat konfigurasi pemetaan';
+        toast.error(msg);
       })
       .finally(() => {
         setMappingsLoading(false);
@@ -219,31 +228,31 @@ export const SyncConfigPage: React.FC = () => {
     switch (status) {
       case 'SUCCESS':
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
+          <Badge variant="safe" className="inline-flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" />
             Sukses
-          </span>
+          </Badge>
         );
       case 'PARTIAL':
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800">
-            <AlertTriangle className="h-3 w-3 mr-1" />
+          <Badge variant="warning" className="inline-flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
             Parsial
-          </span>
+          </Badge>
         );
       case 'FAILED':
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800">
-            <XCircle className="h-3 w-3 mr-1" />
+          <Badge variant="critical" className="inline-flex items-center gap-1">
+            <XCircle className="h-3 w-3" />
             Gagal
-          </span>
+          </Badge>
         );
       case 'RUNNING':
         return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800">
-            <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+          <Badge variant="default" className="inline-flex items-center gap-1">
+            <RefreshCw className="h-3 w-3 animate-spin" />
             Berjalan
-          </span>
+          </Badge>
         );
       default:
         return <Badge variant="outline">Belum Ada</Badge>;
@@ -255,9 +264,14 @@ export const SyncConfigPage: React.FC = () => {
       {/* Header and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Konfigurasi Sinkronisasi Sheets — Pabrik {lokasiParam}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Sinkronisasi & Pemetaan — Pabrik {lokasiParam}
+            </h1>
+            <Badge variant="outline" className="text-xs uppercase font-mono tracking-wider">
+              {lokasiParam}
+            </Badge>
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Pengaturan pemetaan Google Sheets, pelacakan cron otomatis, dan trigger sinkronisasi manual.
           </p>
@@ -269,7 +283,7 @@ export const SyncConfigPage: React.FC = () => {
             size="sm"
             onClick={loadStatus}
             disabled={statusLoading}
-            className="h-8 text-xs"
+            className="h-8 text-xs min-h-[36px] sm:min-h-[32px]"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${statusLoading ? 'animate-spin' : ''}`} />
             Segarkan Status
@@ -280,21 +294,42 @@ export const SyncConfigPage: React.FC = () => {
             size="sm"
             onClick={handleTriggerSync}
             disabled={syncing || statusLoading}
-            className="h-8 text-xs"
+            className="h-8 text-xs min-h-[36px] sm:min-h-[32px]"
           >
             <Play className={`h-3.5 w-3.5 mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Menyinkronkan...' : 'Jalankan Sinkronisasi Sekarang'}
+            {syncing ? 'Menyinkronkan...' : 'Jalankan Sekarang'}
           </Button>
         </div>
       </div>
 
-      {/* Stale Warning Banner */}
+      {/* Stale Warning Banner (SPEC 9.4 Poin 10) */}
       {syncStatus?.stale && (
-        <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-amber-800 dark:text-amber-300 text-xs">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="flex items-center gap-2 p-3 bg-warning-bg border border-warning/30 rounded-md text-warning text-xs">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
           <span>
-            Peringatan: Sinkronisasi terakhir berhasil lebih dari 2 jam yang lalu. Periksa jadwal cron atau jalankan sinkronisasi manual.
+            Data terakhir diperbarui {syncStatus.lastSuccessAt ? formatDateTime(syncStatus.lastSuccessAt) : 'belum pernah'}. Angka di bawah mungkin belum mencerminkan kondisi terbaru.
           </span>
+        </div>
+      )}
+
+      {/* Error State with Retry Button (SPEC 9.4 Poin 9) */}
+      {error && !statusLoading && (
+        <div className="p-8 text-center rounded-lg border border-destructive/20 bg-destructive/10 text-destructive shadow-xs">
+          <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-destructive/10 text-destructive mb-3">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium">{error}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={() => {
+              loadStatus();
+              loadMappings();
+            }}
+          >
+            Coba Lagi
+          </Button>
         </div>
       )}
 
@@ -325,10 +360,10 @@ export const SyncConfigPage: React.FC = () => {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-xs font-semibold text-foreground tabular-nums mt-1">
+            <div className="text-xs font-semibold text-foreground tabular-nums mt-1 font-mono">
               {syncStatus?.lastRun?.startedAt ? formatDateTime(syncStatus.lastRun.startedAt) : 'Belum pernah'}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-1">
+            <p className="text-[11px] text-muted-foreground mt-1 tabular-nums">
               Sukses terakhir: {syncStatus?.lastSuccessAt ? formatDateTime(syncStatus.lastSuccessAt) : 'Belum pernah'}
             </p>
           </CardContent>
@@ -339,10 +374,10 @@ export const SyncConfigPage: React.FC = () => {
             <CardTitle className="text-xs font-medium text-muted-foreground">
               Baris Diterima (Accepted)
             </CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2 className="h-4 w-4 text-status-safe" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
+            <div className="text-xl font-bold tracking-tight text-status-safe tabular-nums">
               {formatInt(syncStatus?.lastRun?.rowsAccepted || 0)} Baris
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">
@@ -356,11 +391,11 @@ export const SyncConfigPage: React.FC = () => {
             <CardTitle className="text-xs font-medium text-muted-foreground">
               Baris Ditolak (Rejected)
             </CardTitle>
-            <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+            <XCircle className="h-4 w-4 text-status-critical" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <div className={`text-xl font-bold tracking-tight tabular-nums ${
-              (syncStatus?.lastRun?.rowsRejected || 0) > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'
+              (syncStatus?.lastRun?.rowsRejected || 0) > 0 ? 'text-status-critical' : 'text-foreground'
             }`}>
               {formatInt(syncStatus?.lastRun?.rowsRejected || 0)} Baris
             </div>
@@ -400,15 +435,30 @@ export const SyncConfigPage: React.FC = () => {
             </TableHeader>
             <TableBody>
               {mappingsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">
-                    Memuat pemetaan kolom...
-                  </TableCell>
-                </TableRow>
+                <>
+                  {[...Array(6)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-14" /></TableCell>
+                      <TableCell className="text-center"><Skeleton className="h-4 w-10 mx-auto" /></TableCell>
+                      <TableCell className="text-center"><Skeleton className="h-4 w-10 mx-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-7 w-16 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ) : !mappings.length ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">
-                    Belum ada konfigurasi pemetaan untuk lokasi ini.
+                  <TableCell colSpan={8} className="text-center py-12">
+                    <FileSpreadsheet className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-foreground">
+                      Belum ada konfigurasi pemetaan untuk lokasi ini.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Konfigurasi otomatis dibuat saat inisialisasi awal pabrik.
+                    </p>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -420,12 +470,12 @@ export const SyncConfigPage: React.FC = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs font-medium text-foreground">
-                      <span className={m.tab.includes('TODO_CONFIRM') ? 'text-amber-600 dark:text-amber-400 font-mono text-[11px]' : ''}>
+                      <span className={m.tab.includes('TODO_CONFIRM') ? 'text-warning font-mono text-[11px]' : ''}>
                         {m.tab}
                       </span>
                     </TableCell>
                     <TableCell className="text-xs font-medium text-foreground">
-                      <span className={m.sourceHeader.includes('TODO_CONFIRM') ? 'text-amber-600 dark:text-amber-400 font-mono text-[11px]' : ''}>
+                      <span className={m.sourceHeader.includes('TODO_CONFIRM') ? 'text-warning font-mono text-[11px]' : ''}>
                         {m.sourceHeader}
                       </span>
                     </TableCell>
@@ -437,14 +487,14 @@ export const SyncConfigPage: React.FC = () => {
                     </TableCell>
                     <TableCell className="text-center text-xs">
                       {m.required ? (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Ya</span>
+                        <span className="text-status-safe font-medium">Ya</span>
                       ) : (
                         <span className="text-muted-foreground">Opsional</span>
                       )}
                     </TableCell>
                     <TableCell className="text-center text-xs">
                       {m.isKey ? (
-                        <span className="text-blue-600 dark:text-blue-400 font-medium">Kunci</span>
+                        <span className="text-primary font-medium">Kunci</span>
                       ) : (
                         '—'
                       )}
@@ -454,7 +504,7 @@ export const SyncConfigPage: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleOpenEdit(m)}
-                        className="h-7 text-xs px-2 text-primary"
+                        className="h-7 text-xs px-2 text-primary hover:bg-muted"
                       >
                         <Edit2 className="h-3 w-3 mr-1" />
                         Ubah
@@ -470,10 +520,10 @@ export const SyncConfigPage: React.FC = () => {
 
       {/* Rejected Rows Log Card (Only visible if there are rejected rows) */}
       {rejectedRowsList.length > 0 && (
-        <Card className="shadow-xs overflow-hidden border-rose-500/30">
-          <CardHeader className="p-4 pb-3 bg-rose-500/5 flex flex-row items-center justify-between">
+        <Card className="shadow-xs overflow-hidden border-status-critical/30">
+          <CardHeader className="p-4 pb-3 bg-status-critical-bg/20 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-sm font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1.5">
+              <CardTitle className="text-sm font-semibold text-status-critical flex items-center gap-1.5">
                 <AlertTriangle className="h-4 w-4" />
                 Laporan Baris Ditolak pada Sinkronisasi Terakhir ({rejectedRowsList.length} Baris)
               </CardTitle>
@@ -508,7 +558,7 @@ export const SyncConfigPage: React.FC = () => {
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {rej.field || '—'}
                     </TableCell>
-                    <TableCell className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                    <TableCell className="text-xs text-status-critical font-medium">
                       {rej.reason}
                     </TableCell>
                   </TableRow>

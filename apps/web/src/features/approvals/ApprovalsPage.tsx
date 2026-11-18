@@ -84,6 +84,7 @@ export const ApprovalsPage: React.FC = () => {
 
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('PENDING');
 
   // Sheet detail state
@@ -150,6 +151,7 @@ export const ApprovalsPage: React.FC = () => {
   const loadRequests = useCallback(async () => {
     if (!activeLocationId) return;
     setIsLoading(true);
+    setError(null);
     try {
       const data = await api<RequestItem[]>(`/approvals?locationId=${activeLocationId}`);
       setRequests(data);
@@ -159,7 +161,8 @@ export const ApprovalsPage: React.FC = () => {
         if (updated) setSelectedRequest(updated);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat daftar pengajuan';
+      const msg = err instanceof Error ? err.message : 'Data pengajuan gagal dimuat. Periksa koneksi, lalu coba lagi.';
+      setError(msg);
       toast.error(msg);
     } finally {
       setIsLoading(false);
@@ -334,35 +337,26 @@ export const ApprovalsPage: React.FC = () => {
     }
   };
 
-  // Render Status Badge
+  // Render Status Badge using Design Tokens
   const renderStatusBadge = (status: RequestItem['status']) => {
     switch (status) {
       case 'PENDING':
         return (
-          <Badge
-            variant="outline"
-            className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800 font-medium inline-flex items-center gap-1"
-          >
+          <Badge variant="warning" className="font-medium inline-flex items-center gap-1">
             <Clock className="h-3 w-3" />
             Menunggu
           </Badge>
         );
       case 'APPROVED':
         return (
-          <Badge
-            variant="outline"
-            className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 font-medium inline-flex items-center gap-1"
-          >
+          <Badge variant="safe" className="font-medium inline-flex items-center gap-1">
             <CheckCircle2 className="h-3 w-3" />
             Disetujui
           </Badge>
         );
       case 'REJECTED':
         return (
-          <Badge
-            variant="outline"
-            className="bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800 font-medium inline-flex items-center gap-1"
-          >
+          <Badge variant="critical" className="font-medium inline-flex items-center gap-1">
             <XCircle className="h-3 w-3" />
             Ditolak
           </Badge>
@@ -402,12 +396,12 @@ export const ApprovalsPage: React.FC = () => {
         )}
       </div>
 
-      {/* Tabs Filter Bar */}
-      <div className="flex items-center gap-2 border-b border-border pb-px">
+      {/* Tabs Filter Bar (Scrollable for mobile 360px) */}
+      <div className="flex items-center gap-2 border-b border-border pb-px overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveTab('PENDING')}
-          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
+          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
             activeTab === 'PENDING'
               ? 'border-primary text-foreground font-semibold'
               : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -417,7 +411,7 @@ export const ApprovalsPage: React.FC = () => {
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'PENDING'
-                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 font-semibold'
+                ? 'bg-status-minimum-bg text-status-minimum font-semibold'
                 : 'bg-muted text-muted-foreground'
             }`}
           >
@@ -428,7 +422,7 @@ export const ApprovalsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('APPROVED')}
-          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
+          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
             activeTab === 'APPROVED'
               ? 'border-primary text-foreground font-semibold'
               : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -438,7 +432,7 @@ export const ApprovalsPage: React.FC = () => {
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'APPROVED'
-                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 font-semibold'
+                ? 'bg-status-safe-bg text-status-safe font-semibold'
                 : 'bg-muted text-muted-foreground'
             }`}
           >
@@ -449,7 +443,7 @@ export const ApprovalsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('REJECTED')}
-          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
+          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
             activeTab === 'REJECTED'
               ? 'border-primary text-foreground font-semibold'
               : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -459,7 +453,7 @@ export const ApprovalsPage: React.FC = () => {
           <span
             className={`px-1.5 py-0.2 rounded-full text-[10px] ${
               activeTab === 'REJECTED'
-                ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 font-semibold'
+                ? 'bg-status-critical-bg text-status-critical font-semibold'
                 : 'bg-muted text-muted-foreground'
             }`}
           >
@@ -470,7 +464,7 @@ export const ApprovalsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('ALL')}
-          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors ${
+          className={`inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium border-b-2 transition-colors shrink-0 ${
             activeTab === 'ALL'
               ? 'border-primary text-foreground font-semibold'
               : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -482,6 +476,24 @@ export const ApprovalsPage: React.FC = () => {
           </span>
         </button>
       </div>
+
+      {/* Error State with Retry Button (SPEC 9.4 Poin 9) */}
+      {error && !isLoading && (
+        <div className="p-8 text-center rounded-lg border border-destructive/20 bg-destructive/10 text-destructive shadow-xs">
+          <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-destructive/10 text-destructive mb-3">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium">{error}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={loadRequests}
+          >
+            Coba Lagi
+          </Button>
+        </div>
+      )}
 
       {/* Main Table Card */}
       <div className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
@@ -572,7 +584,7 @@ export const ApprovalsPage: React.FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 px-2 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+                                className="h-7 px-2 text-xs border-status-safe/40 text-status-safe hover:bg-status-safe-bg"
                                 onClick={() => promptApprove(req)}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
@@ -581,7 +593,7 @@ export const ApprovalsPage: React.FC = () => {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 px-2 text-xs border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                                className="h-7 px-2 text-xs border-status-critical/40 text-status-critical hover:bg-status-critical-bg"
                                 onClick={() => promptReject(req)}
                               >
                                 <XCircle className="h-3.5 w-3.5 mr-1" />
@@ -689,7 +701,7 @@ export const ApprovalsPage: React.FC = () => {
                           Diputuskan pada {formatDateTime(app.decidedAt)}
                         </div>
                         {app.note && (
-                          <div className="mt-1 p-2 rounded bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300 text-xs">
+                          <div className="mt-1 p-2 rounded bg-status-critical-bg border border-status-critical/30 text-status-critical text-xs">
                             <span className="font-semibold block mb-0.5">Alasan Penolakan:</span>
                             {app.note}
                           </div>
@@ -701,7 +713,7 @@ export const ApprovalsPage: React.FC = () => {
 
                 {/* Self-approval Warning if requester is viewer */}
                 {selectedRequest.status === 'PENDING' && selectedRequest.requesterId === user?.id && (
-                  <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+                  <div className="p-3 rounded-lg border border-warning/30 bg-warning-bg text-warning text-xs flex items-start gap-2">
                     <Info className="h-4 w-4 shrink-0 mt-0.5" />
                     <div>
                       <span className="font-medium block">Pemisahan Tugas:</span>
@@ -715,7 +727,7 @@ export const ApprovalsPage: React.FC = () => {
               {selectedRequest.status === 'PENDING' && canDecide && selectedRequest.requesterId !== user?.id && (
                 <div className="pt-4 border-t border-border flex items-center gap-2">
                   <Button
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="flex-1 bg-status-safe hover:bg-status-safe/90 text-primary-foreground"
                     onClick={() => {
                       promptApprove(selectedRequest);
                     }}
@@ -873,7 +885,7 @@ export const ApprovalsPage: React.FC = () => {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <CheckCircle2 className="h-5 w-5 text-status-safe" />
               Setujui Pengajuan
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground pt-1">
@@ -902,7 +914,7 @@ export const ApprovalsPage: React.FC = () => {
               size="sm"
               onClick={handleApprove}
               disabled={isDeciding}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white inline-flex items-center gap-1.5"
+              className="bg-status-safe hover:bg-status-safe/90 text-primary-foreground inline-flex items-center gap-1.5"
             >
               {isDeciding && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Setujui Pengajuan

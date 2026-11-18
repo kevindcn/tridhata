@@ -9,6 +9,7 @@ import {
   AlertCircle,
   AlertOctagon,
   XCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { formatInt, formatRupiah, formatDateTime } from '@/lib/format';
@@ -16,6 +17,7 @@ import { downloadCsv } from '@/lib/download';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -40,6 +42,7 @@ export const InventoryPage: React.FC = () => {
 
   const [locationId, setLocationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [data, setData] = useState<InventoryDashboard | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -53,8 +56,9 @@ export const InventoryPage: React.FC = () => {
           setLocationId(found.id);
         }
       })
-      .catch((err) => {
-        toast.error('Gagal memuat data lokasi: ' + err.message);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Gagal memuat data lokasi';
+        toast.error(msg);
       });
   }, [lokasiParam]);
 
@@ -62,13 +66,16 @@ export const InventoryPage: React.FC = () => {
   const fetchData = () => {
     if (!locationId) return;
     setLoading(true);
+    setError(null);
     const query = statusFilter !== 'ALL' ? `&status=${statusFilter}` : '';
     api<InventoryDashboard>(`/dashboard/inventory?locationId=${locationId}${query}`)
       .then((res) => {
         setData(res);
       })
-      .catch((err) => {
-        toast.error('Gagal memuat status persediaan: ' + err.message);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Data persediaan gagal dimuat. Periksa koneksi, lalu coba lagi.';
+        setError(msg);
+        toast.error(msg);
       })
       .finally(() => {
         setLoading(false);
@@ -101,29 +108,13 @@ export const InventoryPage: React.FC = () => {
   const getStatusBadge = (status: StockStatus) => {
     switch (status) {
       case 'SAFE':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800">
-            Aman
-          </span>
-        );
+        return <Badge variant="safe">Aman</Badge>;
       case 'MINIMUM':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800">
-            Minimal
-          </span>
-        );
+        return <Badge variant="minimum">Minimal</Badge>;
       case 'CRITICAL':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-800">
-            Kritis
-          </span>
-        );
+        return <Badge variant="critical">Kritis</Badge>;
       case 'EMPTY':
-        return (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800">
-            Habis
-          </span>
-        );
+        return <Badge variant="empty">Habis</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -134,9 +125,14 @@ export const InventoryPage: React.FC = () => {
       {/* Header and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Status Persediaan — Pabrik {lokasiParam}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Persediaan Barang — Pabrik {lokasiParam}
+            </h1>
+            <Badge variant="outline" className="text-xs uppercase font-mono tracking-wider">
+              {lokasiParam}
+            </Badge>
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             Monitoring level stok fisik, ambang pengaman (buffer & safety stock), dan nilai total aset persediaan.
           </p>
@@ -148,7 +144,7 @@ export const InventoryPage: React.FC = () => {
             size="sm"
             onClick={fetchData}
             disabled={loading}
-            className="h-8 text-xs"
+            className="h-8 text-xs min-h-[36px] sm:min-h-[32px]"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Segarkan
@@ -159,7 +155,7 @@ export const InventoryPage: React.FC = () => {
             size="sm"
             onClick={handleExport}
             disabled={exporting || loading}
-            className="h-8 text-xs"
+            className="h-8 text-xs min-h-[36px] sm:min-h-[32px]"
           >
             <Download className="h-3.5 w-3.5 mr-1.5" />
             {exporting ? 'Mengunduh...' : 'Unduh CSV'}
@@ -167,122 +163,153 @@ export const InventoryPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stale Warning Banner */}
+      {/* Stale Warning Banner (SPEC 9.4 Poin 10) */}
       {data?.meta.stale && (
-        <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-md text-amber-800 dark:text-amber-300 text-xs">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="flex items-center gap-2 p-3 bg-warning-bg border border-warning/30 rounded-md text-warning text-xs">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
           <span>
-            Peringatan: Data sinkronisasi persediaan belum diperbarui lebih dari 2 jam. Posisi stok mungkin belum mencerminkan mutasi terkini.
+            Data terakhir diperbarui {data.meta.lastSuccessAt ? formatDateTime(data.meta.lastSuccessAt) : 'belum pernah'}. Angka di bawah mungkin belum mencerminkan kondisi terbaru.
           </span>
         </div>
       )}
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {/* Total SKU */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground">
-              Total SKU
-            </CardTitle>
-            <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold tracking-tight text-foreground tabular-nums">
-              {data ? formatInt(data.cards.totalSku) : '0'}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Error State with Retry Button (SPEC 9.4 Poin 9) */}
+      {error && !loading && (
+        <div className="p-8 text-center rounded-lg border border-destructive/20 bg-destructive/10 text-destructive shadow-xs">
+          <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-full bg-destructive/10 text-destructive mb-3">
+            <AlertCircle className="h-5 w-5" />
+          </div>
+          <p className="text-sm font-medium">{error}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={fetchData}
+          >
+            Coba Lagi
+          </Button>
+        </div>
+      )}
 
-        {/* Aman */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-              Aman
-            </CardTitle>
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
-              {data ? formatInt(data.cards.safeCount) : '0'}
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI Cards Grid (SPEC 9.6: Lima kartu dengan garis kiri 3px berwarna status) */}
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+      ) : data ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* 1. Total Produk Jadi */}
+          <Card className="shadow-xs">
+            <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-[11px] font-medium text-muted-foreground">
+                Total Produk Jadi
+              </CardTitle>
+              <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold tracking-tight text-foreground tabular-nums">
+                {formatInt(data.cards.totalSku)} SKU
+              </div>
+              {data.cards.stockValue !== null && data.cards.stockValue !== undefined && (
+                <p className="text-[10px] text-muted-foreground mt-0.5 truncate font-mono tabular-nums">
+                  Nilai: {formatRupiah(data.cards.stockValue)}
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Minimal */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
-              Minimal
-            </CardTitle>
-            <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold tracking-tight text-amber-600 dark:text-amber-400 tabular-nums">
-              {data ? formatInt(data.cards.minimumCount) : '0'}
-            </div>
-          </CardContent>
-        </Card>
+          {/* 2. Aman (garis kiri 3px berwarna status per SPEC 9.6) */}
+          <Card className="shadow-xs border-l-[3px] border-l-status-safe">
+            <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-[11px] font-medium text-status-safe">
+                Aman
+              </CardTitle>
+              <ShieldCheck className="h-3.5 w-3.5 text-status-safe" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold tracking-tight text-status-safe tabular-nums">
+                {formatInt(data.cards.safeCount)} SKU
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Stok di atas batas minimum
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* Kritis */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[11px] font-medium text-orange-600 dark:text-orange-400">
-              Kritis
-            </CardTitle>
-            <AlertOctagon className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold tracking-tight text-orange-600 dark:text-orange-400 tabular-nums">
-              {data ? formatInt(data.cards.criticalCount) : '0'}
-            </div>
-          </CardContent>
-        </Card>
+          {/* 3. Minimal (garis kiri 3px berwarna status per SPEC 9.6) */}
+          <Card className="shadow-xs border-l-[3px] border-l-status-minimum">
+            <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-[11px] font-medium text-status-minimum">
+                Minimal
+              </CardTitle>
+              <AlertCircle className="h-3.5 w-3.5 text-status-minimum" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold tracking-tight text-status-minimum tabular-nums">
+                {formatInt(data.cards.minimumCount)} SKU
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Mendekati safety stock
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* Habis */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[11px] font-medium text-rose-600 dark:text-rose-400">
-              Habis
-            </CardTitle>
-            <XCircle className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-lg font-bold tracking-tight text-rose-600 dark:text-rose-400 tabular-nums">
-              {data ? formatInt(data.cards.emptyCount) : '0'}
-            </div>
-          </CardContent>
-        </Card>
+          {/* 4. Kritis (garis kiri 3px berwarna status per SPEC 9.6) */}
+          <Card className="shadow-xs border-l-[3px] border-l-status-critical">
+            <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-[11px] font-medium text-status-critical">
+                Kritis
+              </CardTitle>
+              <AlertOctagon className="h-3.5 w-3.5 text-status-critical" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold tracking-tight text-status-critical tabular-nums">
+                {formatInt(data.cards.criticalCount)} SKU
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Di bawah safety stock
+              </p>
+            </CardContent>
+          </Card>
 
-        {/* Total Nilai Stok */}
-        <Card className="shadow-xs">
-          <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground">
-              Total Nilai Stok
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-sm font-bold tracking-tight text-foreground truncate tabular-nums">
-              {data?.cards.stockValue !== null && data?.cards.stockValue !== undefined
-                ? formatRupiah(data.cards.stockValue)
-                : '—'}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          {/* 5. Habis (garis kiri 3px berwarna status per SPEC 9.6) */}
+          <Card className="shadow-xs border-l-[3px] border-l-status-empty">
+            <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-[11px] font-medium text-status-empty">
+                Habis
+              </CardTitle>
+              <XCircle className="h-3.5 w-3.5 text-status-empty" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-lg font-bold tracking-tight text-status-empty tabular-nums">
+                {formatInt(data.cards.emptyCount)} SKU
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Stok fisik 0 unit
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       {/* Tabs Filter & Table */}
       <Card className="shadow-xs overflow-hidden">
         <div className="p-3 border-b border-border bg-card flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-auto">
-            <TabsList className="h-8">
-              <TabsTrigger value="ALL" className="text-xs px-3">Semua</TabsTrigger>
-              <TabsTrigger value="SAFE" className="text-xs px-3">Aman</TabsTrigger>
-              <TabsTrigger value="MINIMUM" className="text-xs px-3">Minimal</TabsTrigger>
-              <TabsTrigger value="CRITICAL" className="text-xs px-3">Kritis</TabsTrigger>
-              <TabsTrigger value="EMPTY" className="text-xs px-3">Habis</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="overflow-x-auto pb-1 sm:pb-0">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-auto">
+              <TabsList className="h-8">
+                <TabsTrigger value="ALL" className="text-xs px-3">Semua</TabsTrigger>
+                <TabsTrigger value="SAFE" className="text-xs px-3">Aman</TabsTrigger>
+                <TabsTrigger value="MINIMUM" className="text-xs px-3">Minimal</TabsTrigger>
+                <TabsTrigger value="CRITICAL" className="text-xs px-3">Kritis</TabsTrigger>
+                <TabsTrigger value="EMPTY" className="text-xs px-3">Habis</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
           <span className="text-xs text-muted-foreground">
             Menampilkan {data?.rows.length || 0} SKU
@@ -305,15 +332,30 @@ export const InventoryPage: React.FC = () => {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">
-                    Memuat daftar persediaan barang...
-                  </TableCell>
-                </TableRow>
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                      <TableCell className="text-center"><Skeleton className="h-5 w-16 mx-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ) : !data?.rows.length ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-xs text-muted-foreground">
-                    Tidak ada persediaan ditemukan untuk kategori status ini.
+                  <TableCell colSpan={8} className="text-center py-12">
+                    <FileSpreadsheet className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
+                    <p className="text-xs font-medium text-foreground">
+                      Tidak ada persediaan barang ditemukan untuk kategori status ini.
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Ubah filter status atau periksa riwayat sinkronisasi data melalui menu Administrasi.
+                    </p>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -337,7 +379,7 @@ export const InventoryPage: React.FC = () => {
                     <TableCell className="text-center">
                       {getStatusBadge(item.status)}
                     </TableCell>
-                    <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
+                    <TableCell className="text-right text-xs tabular-nums text-muted-foreground font-mono">
                       {item.value !== null && item.value !== undefined ? formatRupiah(item.value) : '—'}
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums text-muted-foreground">

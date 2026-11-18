@@ -378,108 +378,110 @@ export const UsersPage: React.FC = () => {
             </p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[280px]">Nama & Email</TableHead>
-                <TableHead className="w-[120px]">Peran</TableHead>
-                <TableHead className="w-[140px]">Divisi</TableHead>
-                <TableHead>Akses Fasilitas</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
-                <TableHead className="w-[80px] text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium text-foreground">
-                        {user.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {user.email}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        user.role === 'ADMIN'
-                          ? 'default'
-                          : user.role === 'FINANCE'
-                            ? 'secondary'
-                            : 'outline'
-                      }
-                      className="text-[11px]"
-                    >
-                      {user.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {user.division || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {user.locations.map((loc) => (
-                        <Badge
-                          key={loc.id}
-                          variant="outline"
-                          className="text-[10px] bg-muted/30"
-                        >
-                          {loc.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {user.active ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-status-safe">
-                        <span className="h-1.5 w-1.5 rounded-full bg-status-safe" />
-                        Aktif
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
-                        Nonaktif
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                          <span className="sr-only">Menu Opsi</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
-                        <DropdownMenuItem
-                          onClick={() => handleOpenEdit(user)}
-                          className="text-xs cursor-pointer gap-2"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                          Ubah Data
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleOpenReset(user)}
-                          className="text-xs cursor-pointer gap-2 text-warning focus:text-warning"
-                        >
-                          <KeyRound className="h-3.5 w-3.5" />
-                          Atur Ulang Sandi
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[280px]">Nama & Email</TableHead>
+                  <TableHead className="w-[120px]">Peran</TableHead>
+                  <TableHead className="w-[140px]">Divisi</TableHead>
+                  <TableHead>Akses Fasilitas</TableHead>
+                  <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead className="w-[80px] text-right">Aksi</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium text-foreground">
+                          {user.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {user.email}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          user.role === 'ADMIN'
+                            ? 'default'
+                            : user.role === 'FINANCE'
+                              ? 'secondary'
+                              : 'outline'
+                        }
+                        className="text-[11px]"
+                      >
+                        {user.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {user.division || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {user.locations.map((loc) => (
+                          <Badge
+                            key={loc.id}
+                            variant="outline"
+                            className="text-[10px] bg-muted/30"
+                          >
+                            {loc.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.active ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-status-safe">
+                          <span className="h-1.5 w-1.5 rounded-full bg-status-safe" />
+                          Aktif
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                          Nonaktif
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Menu Opsi</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            onClick={() => handleOpenEdit(user)}
+                            className="text-xs cursor-pointer gap-2"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                            Ubah Data
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => handleOpenReset(user)}
+                            className="text-xs cursor-pointer gap-2 text-warning focus:text-warning"
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                            Atur Ulang Sandi
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
 
