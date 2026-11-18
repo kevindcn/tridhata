@@ -8,6 +8,7 @@ import { LocationsModule } from './modules/locations/locations.module';
 import { UsersModule } from './modules/users/users.module';
 import { SheetsSyncModule } from './modules/sheets-sync/sheets-sync.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { ApprovalsModule } from './modules/approvals/approvals.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -50,6 +51,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     UsersModule,
     SheetsSyncModule,
     DashboardModule,
+    ApprovalsModule,
     AuthModule,
     HealthModule,
   ],

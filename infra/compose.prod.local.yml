@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16
+    container_name: tridhata-db-prod-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-tridhata}
+    volumes:
+      - pgdata_prod_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-tridhata}']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - internal
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: tridhata-api-prod-local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-tridhata}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-tridhata-production-local-secret-32chars}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-tridhata-refresh-production-local-secret-32chars}
+      APP_ORIGIN: http://localhost:8080
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+    networks:
+      - internal
+      - edge
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    container_name: tridhata-web-prod-local
+    restart: unless-stopped
+    environment:
+      API_ORIGIN: http://localhost:3000
+    ports:
+      - '8080:80'
+    networks:
+      - edge
+
+volumes:
+  pgdata_prod_local:
+
+networks:
+  internal:
+  edge:

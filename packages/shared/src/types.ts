@@ -168,3 +168,39 @@ export interface SyncStatusResponse {
   stale: boolean;
   staleAfterMinutes: number;
 }
+
+export interface ApprovalItem {
+  id: string;
+  requestId: string;
+  approverId: string;
+  approver: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  level: number;
+  decision: 'APPROVED' | 'REJECTED';
+  note: string | null;
+  decidedAt: string;
+}
+
+export interface RequestItem {
+  id: string;
+  requesterId: string;
+  requester: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  locationId: string;
+  type: string;
+  title: string;
+  note: string | null;
+  amount: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  version: number;
+  decidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  approvals: ApprovalItem[];
+}
