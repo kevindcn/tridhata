@@ -15,11 +15,14 @@ import {
   AuthUser,
   ChangePasswordDto,
   changePasswordSchema,
+  GoogleExchangeDto,
+  googleExchangeSchema,
   LoginDto,
   loginSchema,
   ReqCtx,
 } from '@tridhata/shared';
 import { AuthService } from './auth.service';
+import { GoogleOAuthService } from './google-oauth.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequestContext } from '../../common/decorators/req-ctx.decorator';
@@ -27,7 +30,10 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 
 @Controller()
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly googleOAuthService: GoogleOAuthService,
+  ) {}
 
   @Public()
   @Throttle(
@@ -118,6 +124,83 @@ export class AuthController {
   @Get('me')
   async getMe(@CurrentUser() user: AuthUser) {
     return this.authService.getMe(user);
+  }
+
+  @Public()
+  @Get('auth/google')
+  async googleLogin(@Res() reply: FastifyReply) {
+    const { url, state } = this.googleOAuthService.getAuthorizationUrl();
+
+    reply.setCookie('oauth_state', state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/auth',
+      maxAge: 600, // 10 menit
+    });
+
+    return reply.redirect(url);
+  }
+
+  @Public()
+  @Get('auth/google/callback')
+  async googleCallback(
+    @Req() req: FastifyRequest,
+    @RequestContext() ctx: ReqCtx,
+    @Res() reply: FastifyReply,
+  ) {
+    const frontendOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+    const query = (req.query || {}) as { code?: string; state?: string; error?: string };
+    const cookies = (req.cookies || {}) as Record<string, string | undefined>;
+    const cookieState = cookies.oauth_state;
+
+    // Bersihkan cookie oauth_state setelah diterima
+    reply.clearCookie('oauth_state', { path: '/auth' });
+
+    if (query.error) {
+      return reply.redirect(
+        `${frontendOrigin}/login?error=GOOGLE_AUTH_CANCELLED`,
+      );
+    }
+
+    if (!query.code || !query.state) {
+      return reply.redirect(
+        `${frontendOrigin}/login?error=STATE_MISMATCH`,
+      );
+    }
+
+    try {
+      const result = await this.googleOAuthService.handleCallback(
+        query.code,
+        query.state,
+        cookieState,
+        ctx,
+      );
+
+      this.setRefreshTokenCookie(reply, result.rawRefreshToken);
+
+      return reply.redirect(
+        `${frontendOrigin}/auth/callback?ticket=${encodeURIComponent(result.ticket)}`,
+      );
+    } catch (err: unknown) {
+      const errorObj = err as {
+        response?: { code?: string; details?: { email?: string } };
+      };
+      const code = errorObj?.response?.code || 'AUTH_FAILED';
+      const email = errorObj?.response?.details?.email;
+      const emailParam = email ? `&email=${encodeURIComponent(email)}` : '';
+
+      return reply.redirect(`${frontendOrigin}/login?error=${code}${emailParam}`);
+    }
+  }
+
+  @Public()
+  @Post('auth/google/exchange')
+  @HttpCode(HttpStatus.OK)
+  async googleExchange(
+    @Body(new ZodValidationPipe(googleExchangeSchema)) dto: GoogleExchangeDto,
+  ) {
+    return this.googleOAuthService.exchangeTicket(dto.ticket);
   }
 
   private setRefreshTokenCookie(reply: FastifyReply, rawToken: string) {
