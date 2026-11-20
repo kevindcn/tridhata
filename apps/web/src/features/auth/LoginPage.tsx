@@ -17,39 +17,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-/**
- * Logo resmi Tridhata Agro:
- * Lambang segitiga delta hijau dengan lipatan daun origami
- */
-const TridhataAgroLogo: React.FC<{ className?: string }> = ({
-  className = 'h-12 w-12',
-}) => (
-  <svg
-    className={className}
-    viewBox="0 0 100 90"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    aria-hidden="true"
-  >
-    {/* Bingkai luar delta dengan sudut lengkung halus */}
-    <path
-      d="M45.5 8.2C47.5 4.7 52.5 4.7 54.5 8.2L92.8 74.2C94.8 77.7 92.3 82 88.3 82H11.7C7.7 82 5.2 77.7 7.2 74.2L45.5 8.2Z"
-      stroke="#0b5e34"
-      strokeWidth="8.5"
-      strokeLinejoin="round"
-    />
-    {/* Lipatan daun diagonal (hijau tua) */}
-    <path
-      d="M50 18L76 74H52L38 46L50 18Z"
-      fill="#0b5e34"
-    />
-    {/* Aksen lipatan daun sisi dalam (hijau segar) */}
-    <path
-      d="M50 18L36 46L46 66L62 66L50 18Z"
-      fill="#229551"
-    />
-  </svg>
-);
+import tridhataLogo from '@/components/img/tridahata logo.png';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -184,10 +152,11 @@ export const LoginPage: React.FC = () => {
       <div className="relative z-10 w-full max-w-[430px] flex flex-col items-center">
         {/* Header Branding di atas kartu */}
         <div className="flex flex-col items-center mb-6">
-          <TridhataAgroLogo className="h-12 w-12 sm:h-14 sm:w-14 drop-shadow-xs" />
-          <h2 className="mt-2.5 text-base sm:text-lg font-bold tracking-tight text-[#111827]">
-            Tridhata Agro
-          </h2>
+          <img
+            src={tridhataLogo}
+            alt="Tridhata Agro"
+            className="h-20 sm:h-[84px] w-auto object-contain select-none drop-shadow-xs"
+          />
         </div>
 
         {/* Kartu Formulir Masuk */}
