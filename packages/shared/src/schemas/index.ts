@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './google-auth';
 export * from './users';
 export * from './dashboard';
 export * from './approvals';
