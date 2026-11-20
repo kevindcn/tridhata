@@ -42,7 +42,9 @@ export const AuthCallbackPage: React.FC = () => {
 
     const exchange = async () => {
       try {
-        await loginWithTicket(ticket);
+        if (loginWithTicket) {
+          await loginWithTicket(ticket);
+        }
 
         if (window.opener && window.opener !== window) {
           window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS' }, window.location.origin);

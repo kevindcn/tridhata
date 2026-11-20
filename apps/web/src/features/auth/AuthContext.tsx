@@ -22,7 +22,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   login: (dto: LoginDto) => Promise<void>;
-  loginWithTicket: (ticket: string) => Promise<void>;
+  loginWithTicket?: (ticket: string) => Promise<void>;
   logout: () => Promise<void>;
   changePassword: (dto: ChangePasswordDto) => Promise<void>;
   refreshUser: () => Promise<void>;
