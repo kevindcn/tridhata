@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from '@/features/auth/AuthContext';
+import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { RequireAuth } from '@/features/auth/RequireAuth';
 import { RequirePermission } from '@/features/auth/RequirePermission';
 import { AppLayout } from '@/app/layout/AppLayout';
@@ -12,7 +12,24 @@ import { ProductionPage } from '@/features/production/ProductionPage';
 import { InventoryPage } from '@/features/inventory/InventoryPage';
 import { ApprovalsPage } from '@/features/approvals/ApprovalsPage';
 import { SyncConfigPage } from '@/features/admin/SyncConfigPage';
+import { FieldActivityPage } from '@/features/field/FieldActivityPage';
+import { WarehouseOpsPage } from '@/features/warehouse/WarehouseOpsPage';
 import { Toaster } from '@/components/ui/sonner';
+
+/**
+ * Intelligent home redirect based on active user's primary role/permissions
+ */
+function HomeRedirect() {
+  const { hasPermission } = useAuth();
+  if (hasPermission('dashboard:sales')) return <Navigate to="/penjualan" replace />;
+  if (hasPermission('field:activity')) return <Navigate to="/lapangan" replace />;
+  if (hasPermission('warehouse:ops')) return <Navigate to="/gudang" replace />;
+  if (hasPermission('dashboard:inventory')) return <Navigate to="/persediaan" replace />;
+  if (hasPermission('dashboard:production')) return <Navigate to="/produksi" replace />;
+  if (hasPermission('approval:create')) return <Navigate to="/persetujuan" replace />;
+  if (hasPermission('user:manage')) return <Navigate to="/admin/pengguna" replace />;
+  return <Navigate to="/login" replace />;
+}
 
 export default function App() {
   return (
@@ -29,35 +46,59 @@ export default function App() {
 
             {/* Application Shell with Sidebar and Header */}
             <Route element={<AppLayout />}>
-              <Route path="/" element={<Navigate to="/penjualan" replace />} />
+              <Route path="/" element={<HomeRedirect />} />
 
+              {/* Eksekutif / Penjualan */}
               <Route
                 path="/penjualan"
                 element={
-                  <RequirePermission permission="dashboard:read">
+                  <RequirePermission permission="dashboard:sales">
                     <SalesPage />
                   </RequirePermission>
                 }
               />
 
+              {/* Pabrik / Rencana Produksi */}
               <Route
                 path="/produksi"
                 element={
-                  <RequirePermission permission="dashboard:read">
+                  <RequirePermission permission="dashboard:production">
                     <ProductionPage />
                   </RequirePermission>
                 }
               />
 
+              {/* Gudang & Stok / Persediaan */}
               <Route
                 path="/persediaan"
                 element={
-                  <RequirePermission permission="dashboard:read">
+                  <RequirePermission permission="dashboard:inventory">
                     <InventoryPage />
                   </RequirePermission>
                 }
               />
 
+              {/* Sales Lapang & Agronomis */}
+              <Route
+                path="/lapangan"
+                element={
+                  <RequirePermission permission="field:activity">
+                    <FieldActivityPage />
+                  </RequirePermission>
+                }
+              />
+
+              {/* Staf Gudang & Logistik PIC */}
+              <Route
+                path="/gudang"
+                element={
+                  <RequirePermission permission="warehouse:ops">
+                    <WarehouseOpsPage />
+                  </RequirePermission>
+                }
+              />
+
+              {/* Persetujuan, Kasbon & ACC Owner */}
               <Route
                 path="/persetujuan"
                 element={
@@ -67,6 +108,7 @@ export default function App() {
                 }
               />
 
+              {/* Administrasi */}
               <Route
                 path="/admin/pengguna"
                 element={
@@ -97,7 +139,7 @@ export default function App() {
           </Route>
 
           {/* Catch-all redirect */}
-          <Route path="*" element={<Navigate to="/penjualan" replace />} />
+          <Route path="*" element={<HomeRedirect />} />
         </Routes>
         <Toaster position="top-right" richColors />
       </BrowserRouter>

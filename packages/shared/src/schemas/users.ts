@@ -1,7 +1,15 @@
 import { z } from 'zod';
 import { PERMISSIONS } from '../permissions';
 
-export const roleNameSchema = z.enum(['ADMIN', 'FINANCE', 'STAFF']);
+export const roleNameSchema = z.enum([
+  'ADMIN',
+  'OWNER',
+  'FINANCE',
+  'SALES_OFFICE',
+  'SALES_FIELD',
+  'WAREHOUSE',
+  'STAFF',
+]);
 
 export const permissionEnumSchema = z.enum(PERMISSIONS);
 

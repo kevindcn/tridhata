@@ -66,10 +66,12 @@ interface LocationItem {
 type TabKey = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL';
 
 const PREDEFINED_TYPES = [
-  'Diskon Khusus',
-  'Diskon Volume',
-  'Klaim Retur',
-  'Penyesuaian Harga',
+  'Pengajuan Kasbon & Operasional (ke Owner)',
+  'Pembelian Bahan Baku / PO (ke Owner)',
+  'Plafon Kredit Pelanggan (ke Owner)',
+  'Diskon Khusus Penjualan',
+  'Diskon Volume Penjualan',
+  'Klaim Retur Barang',
   'Kompensasi Operasional',
   'Lainnya',
 ];
@@ -118,6 +120,7 @@ export const ApprovalsPage: React.FC = () => {
   const [isDeciding, setIsDeciding] = useState<boolean>(false);
 
   const canDecide = hasPermission('approval:decide');
+  const canOwnerDecide = hasPermission('approval:owner_decide');
   const canCreate = hasPermission('approval:create');
 
   // Load locations
@@ -388,13 +391,42 @@ export const ApprovalsPage: React.FC = () => {
           <Button
             size="sm"
             onClick={() => setIsCreateOpen(true)}
-            className="inline-flex items-center gap-1.5 shadow-xs"
+            className="inline-flex items-center gap-1.5 shadow-xs bg-[#006B45] hover:bg-[#005537] text-white"
           >
             <Plus className="h-4 w-4" />
             Buat Pengajuan
           </Button>
         )}
       </div>
+
+      {/* Role-Specific Context Banners */}
+      {canOwnerDecide && (
+        <div className="flex items-start gap-3 p-3.5 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-950 text-xs shadow-xs">
+          <div className="h-7 w-7 rounded-md bg-amber-200/80 flex items-center justify-center shrink-0 text-amber-900 font-bold text-sm">
+            👑
+          </div>
+          <div className="space-y-0.5">
+            <p className="font-semibold text-amber-900">Hak Akses Persetujuan Eksekutif (Owner ACC)</p>
+            <p className="text-amber-800/90 leading-relaxed">
+              Anda berwenang penuh memutuskan (ACC) permohonan dana kasbon operasional, pembelian bahan baku PO dari Finance, serta diskon khusus pelanggan.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {user?.role === 'FINANCE' && (
+        <div className="flex items-start gap-3 p-3.5 rounded-lg bg-emerald-50/80 border border-emerald-200/80 text-emerald-950 text-xs shadow-xs">
+          <div className="h-7 w-7 rounded-md bg-emerald-200/80 flex items-center justify-center shrink-0 text-emerald-900 font-bold text-sm">
+            💼
+          </div>
+          <div className="space-y-0.5">
+            <p className="font-semibold text-emerald-900">Alur Keuangan: Permohonan Dana ke Owner & ACC Diskon Sales</p>
+            <p className="text-emerald-800/90 leading-relaxed">
+              Klik <strong>Buat Pengajuan</strong> dengan memilih jenis bertanda <em>(ke Owner)</em> untuk mengajukan kasbon atau PO bahan baku ke Direksi. Anda juga dapat menyetujui pengajuan diskon penjualan standar dari tim Sales.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs Filter Bar (Scrollable for mobile 360px) */}
       <div className="flex items-center gap-2 border-b border-border pb-px overflow-x-auto">
@@ -530,8 +562,13 @@ export const ApprovalsPage: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {filteredRequests.map((req) => {
-                  const isOwner = req.requesterId === user?.id;
-                  const canDecideThis = canDecide && !isOwner && req.status === 'PENDING';
+                  const isOwnerReq =
+                    req.type.toLowerCase().includes('owner') || Number(req.amount) >= 50000000;
+                  const isRequester = req.requesterId === user?.id;
+                  const canDecideThis =
+                    !isRequester &&
+                    req.status === 'PENDING' &&
+                    (isOwnerReq ? canOwnerDecide : canDecide);
 
                   return (
                     <TableRow
@@ -553,9 +590,16 @@ export const ApprovalsPage: React.FC = () => {
                       </TableCell>
 
                       <TableCell>
-                        <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                          {req.type}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                            {req.type}
+                          </span>
+                          {isOwnerReq && (
+                            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                              👑 Butuh ACC Owner
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
 
                       <TableCell>
@@ -588,7 +632,7 @@ export const ApprovalsPage: React.FC = () => {
                                 onClick={() => promptApprove(req)}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                                Setujui
+                                {isOwnerReq && canOwnerDecide ? 'ACC Sekarang' : 'Setujui'}
                               </Button>
                               <Button
                                 size="sm"
@@ -600,6 +644,14 @@ export const ApprovalsPage: React.FC = () => {
                                 Tolak
                               </Button>
                             </>
+                          ) : req.status === 'PENDING' && isRequester ? (
+                            <span className="text-[11px] text-muted-foreground italic px-2">
+                              Pemohon Sendiri
+                            </span>
+                          ) : req.status === 'PENDING' && isOwnerReq && !canOwnerDecide ? (
+                            <span className="text-[10px] text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              Menunggu ACC Owner
+                            </span>
                           ) : (
                             <Button
                               size="sm"
@@ -724,28 +776,51 @@ export const ApprovalsPage: React.FC = () => {
               </div>
 
               {/* Action Buttons in Sheet */}
-              {selectedRequest.status === 'PENDING' && canDecide && selectedRequest.requesterId !== user?.id && (
-                <div className="pt-4 border-t border-border flex items-center gap-2">
-                  <Button
-                    className="flex-1 bg-status-safe hover:bg-status-safe/90 text-primary-foreground"
-                    onClick={() => {
-                      promptApprove(selectedRequest);
-                    }}
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                    Setujui
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => {
-                      promptReject(selectedRequest);
-                    }}
-                  >
-                    <XCircle className="h-4 w-4 mr-1.5" />
-                    Tolak
-                  </Button>
-                </div>
+              {selectedRequest.status === 'PENDING' && (
+                (() => {
+                  const isOwnerReq =
+                    selectedRequest.type.toLowerCase().includes('owner') ||
+                    Number(selectedRequest.amount) >= 50000000;
+                  const isRequester = selectedRequest.requesterId === user?.id;
+                  const canDecideThis =
+                    !isRequester && (isOwnerReq ? canOwnerDecide : canDecide);
+
+                  if (!canDecideThis) {
+                    if (isOwnerReq && !canOwnerDecide) {
+                      return (
+                        <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 text-xs flex items-center gap-2">
+                          <Info className="h-4 w-4 shrink-0 text-amber-700" />
+                          <span>Pengajuan ini memerlukan keputusan (ACC) dari Owner / Direktur.</span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }
+
+                  return (
+                    <div className="pt-4 border-t border-border flex items-center gap-2">
+                      <Button
+                        className="flex-1 bg-status-safe hover:bg-status-safe/90 text-primary-foreground"
+                        onClick={() => {
+                          promptApprove(selectedRequest);
+                        }}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                        {isOwnerReq && canOwnerDecide ? 'ACC Permohonan' : 'Setujui'}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          promptReject(selectedRequest);
+                        }}
+                      >
+                        <XCircle className="h-4 w-4 mr-1.5" />
+                        Tolak
+                      </Button>
+                    </div>
+                  );
+                })()
               )}
             </div>
           )}

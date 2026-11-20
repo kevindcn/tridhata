@@ -178,6 +178,18 @@ export class ApprovalsService {
         });
       }
 
+      // Validasi kewenangan ACC: Pengajuan ke Owner atau >= Rp 50.000.000 wajib diputuskan oleh Owner / Direktur
+      const isOwnerLevelRequest =
+        Boolean(req.type && req.type.toLowerCase().includes('owner')) ||
+        Number(req.amount || 0) >= 50000000;
+      if (isOwnerLevelRequest && !user.permissions.includes('approval:owner_decide')) {
+        throw new ForbiddenException({
+          code: 'FORBIDDEN',
+          message:
+            'Pengajuan ke Owner atau transaksi bernilai ≥ Rp 50.000.000 hanya dapat diputuskan (ACC) oleh Owner / Direktur Utama.',
+        });
+      }
+
       // Proteksi keputusan ganda: hanya baris yang masih PENDING yang boleh berubah
       const res = await tx.request.updateMany({
         where: { id, status: 'PENDING' },

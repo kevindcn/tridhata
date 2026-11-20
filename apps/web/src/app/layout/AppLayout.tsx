@@ -15,6 +15,11 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
+  MapPinned,
+  Truck,
+  Sparkles,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { useAuth } from '@/features/auth/AuthContext';
 import { api } from '@/lib/api-client';
@@ -44,6 +49,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Permission, SyncStatusResponse } from '@tridhata/shared';
+import { toast } from 'sonner';
 
 interface LocationItem {
   id: string;
@@ -65,33 +71,55 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    groupName: 'DASHBOARD',
+    groupName: 'EKSEKUTIF & DASHBOARD',
     items: [
       {
         label: 'Ringkasan Penjualan',
         path: '/penjualan',
         icon: TrendingUp,
-        permission: 'dashboard:read',
+        permission: 'dashboard:sales',
       },
       {
         label: 'Rencana Produksi',
         path: '/produksi',
         icon: Factory,
-        permission: 'dashboard:read',
+        permission: 'dashboard:production',
       },
       {
         label: 'Status Persediaan',
         path: '/persediaan',
         icon: Boxes,
-        permission: 'dashboard:read',
+        permission: 'dashboard:inventory',
       },
     ],
   },
   {
-    groupName: 'OPERASIONAL',
+    groupName: 'OPERASIONAL LAPANGAN',
     items: [
       {
-        label: 'Persetujuan Diskon',
+        label: 'Kunjungan & Foto Lapang',
+        path: '/lapangan',
+        icon: MapPinned,
+        permission: 'field:activity',
+      },
+    ],
+  },
+  {
+    groupName: 'GUDANG & LOGISTIK',
+    items: [
+      {
+        label: 'Penerimaan & Surat Jalan',
+        path: '/gudang',
+        icon: Truck,
+        permission: 'warehouse:ops',
+      },
+    ],
+  },
+  {
+    groupName: 'KEUANGAN & PERSETUJUAN',
+    items: [
+      {
+        label: 'Alur Pengajuan & ACC',
         path: '/persetujuan',
         icon: FileCheck2,
         permission: 'approval:create',
@@ -123,8 +151,59 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+const DEMO_ACCOUNTS = [
+  {
+    role: 'OWNER',
+    email: 'owner@tridhata.com',
+    name: 'Ir. Hendra Wijaya',
+    title: 'Owner & Direktur Utama',
+    badge: '👑 Owner / Direktur',
+    desc: 'Laporan omzet, target pabrik, dan hak ACC tertinggi',
+  },
+  {
+    role: 'FINANCE',
+    email: 'budi@tridhata.com',
+    name: 'Budi Santoso',
+    title: 'Finance & Accounting',
+    badge: '💼 Finance & Kasir',
+    desc: 'Omzet Rp, ajukan kasbon/PO ke Owner, ACC diskon sales',
+  },
+  {
+    role: 'SALES_OFFICE',
+    email: 'sales@tridhata.com',
+    name: 'Rian Pratama',
+    title: 'Sales Marketing Kantor',
+    badge: '📊 Sales Marketing',
+    desc: 'Volume Pcs, tanpa rahasia omzet Rp, buat ajuan diskon',
+  },
+  {
+    role: 'SALES_FIELD',
+    email: 'agronomis@tridhata.com',
+    name: 'Agus Santoso, S.P.',
+    title: 'Sales Lapang & Agronomis',
+    badge: '🌾 Sales Lapang',
+    desc: 'Check-in kios/petani, pantau demplot, unggah foto',
+  },
+  {
+    role: 'WAREHOUSE',
+    email: 'gudang@tridhata.com',
+    name: 'Joko Widodo',
+    title: 'Staf Gudang & Logistik PIC',
+    badge: '📦 Gudang & Logistik',
+    desc: 'Penerimaan fisik barang, bukti SJ vendor, cetak SJ PDF',
+  },
+  {
+    role: 'ADMIN',
+    email: 'admin@tridhata.com',
+    name: 'Administrator Utama',
+    title: 'IT & System Admin',
+    badge: '⚙️ Administrator',
+    desc: 'Kelola pengguna, log audit, dan pemetaan Sheets',
+  },
+];
+
 export const AppLayout: React.FC = () => {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, login, logout, hasPermission } = useAuth();
   const [locations, setLocations] = useState<LocationItem[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatusResponse | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -163,7 +242,6 @@ export const AppLayout: React.FC = () => {
       .then((data) => {
         if (!isMounted) return;
         setLocations(data);
-        // Default location check
         if (!searchParams.get('lokasi') && data.length > 0) {
           const defaultLoc = user?.defaultLocationId
             ? data.find((l) => l.id === user.defaultLocationId) || data[0]
@@ -199,6 +277,24 @@ export const AppLayout: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
+  const handleSwitchDemoAccount = async (acc: (typeof DEMO_ACCOUNTS)[0]) => {
+    try {
+      await login({ email: acc.email, password: 'AdminTridhata2026!' });
+      toast.success(`Beralih peran: ${acc.title}`);
+      if (acc.role === 'SALES_FIELD') {
+        navigate(`/lapangan${location.search}`);
+      } else if (acc.role === 'WAREHOUSE') {
+        navigate(`/gudang${location.search}`);
+      } else if (acc.role === 'ADMIN') {
+        navigate(`/admin/pengguna${location.search}`);
+      } else {
+        navigate(`/penjualan${location.search}`);
+      }
+    } catch {
+      toast.error('Gagal beralih akun');
+    }
+  };
+
   // Filter groups and items based on permissions
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
@@ -206,6 +302,27 @@ export const AppLayout: React.FC = () => {
       item.permission ? hasPermission(item.permission) : true,
     ),
   })).filter((group) => group.items.length > 0);
+
+  const getRoleBadgeInfo = (role?: string) => {
+    switch (role) {
+      case 'OWNER':
+        return { label: '👑 OWNER / DIREKTUR', className: 'bg-amber-100 text-amber-800 border-amber-300' };
+      case 'FINANCE':
+        return { label: '💼 FINANCE', className: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+      case 'SALES_OFFICE':
+        return { label: '📊 SALES MARKETING', className: 'bg-blue-100 text-blue-800 border-blue-300' };
+      case 'SALES_FIELD':
+        return { label: '🌾 SALES LAPANG', className: 'bg-lime-100 text-lime-800 border-lime-300' };
+      case 'WAREHOUSE':
+        return { label: '📦 GUDANG & LOGISTIK', className: 'bg-orange-100 text-orange-800 border-orange-300' };
+      case 'ADMIN':
+        return { label: '⚙️ ADMIN', className: 'bg-slate-800 text-white border-slate-700' };
+      default:
+        return { label: role || 'STAF', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+    }
+  };
+
+  const badgeInfo = getRoleBadgeInfo(user?.role);
 
   const renderNavLinks = () => (
     <div className="space-y-6">
@@ -226,7 +343,7 @@ export const AppLayout: React.FC = () => {
                     cn(
                       'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
                       isActive
-                        ? 'bg-accent text-accent-foreground font-medium'
+                        ? 'bg-accent text-accent-foreground font-medium shadow-xs'
                         : 'text-[#475569] hover:bg-muted hover:text-foreground',
                     )
                   }
@@ -242,44 +359,44 @@ export const AppLayout: React.FC = () => {
     </div>
   );
 
-  const getRoleBadgeVariant = (role?: string) => {
-    switch (role) {
-      case 'ADMIN':
-        return 'default';
-      case 'FINANCE':
-        return 'secondary';
-      default:
-        return 'outline';
-    }
-  };
-
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground antialiased">
       {/* Desktop Sidebar (240px) - Sticky and pinned */}
       <aside className="hidden lg:flex w-60 h-screen flex-col border-r border-border bg-card shrink-0 select-none sticky top-0">
-        <div className="h-14 shrink-0 flex items-center px-4 border-b border-border">
+        <div className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-border">
           <Link to={`/penjualan${location.search}`} className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold text-xs shadow-xs">
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[#006B45] text-white font-bold text-xs shadow-xs">
               T
             </div>
             <span className="font-semibold tracking-tight text-sm text-foreground">
               Tridhata Ops
             </span>
           </Link>
+          <span className="text-[10px] font-medium bg-emerald-50 text-[#006B45] border border-emerald-200 px-1.5 py-0.5 rounded">
+            v2.0
+          </span>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4 scroll-smooth">
           {renderNavLinks()}
         </div>
 
+        {/* User Card in Sidebar Bottom */}
         <div className="shrink-0 p-3 border-t border-border">
-          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md bg-muted/40">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+          <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md bg-muted/50 border border-border/50">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#006B45]/10 text-[#006B45] text-xs font-bold shrink-0">
               {user?.name ? user.name.slice(0, 2).toUpperCase() : 'U'}
             </div>
             <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-xs font-medium truncate">{user?.name}</span>
-              <span className="text-[11px] text-muted-foreground truncate">{user?.email}</span>
+              <span className="text-xs font-semibold truncate leading-tight">{user?.name}</span>
+              <span className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
+                {user?.email}
+              </span>
+              <div className="mt-1">
+                <span className={cn('text-[9px] font-semibold px-1.5 py-0.2 rounded border inline-block', badgeInfo.className)}>
+                  {badgeInfo.label}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -305,7 +422,7 @@ export const AppLayout: React.FC = () => {
               <SheetContent side="left" className="w-64 p-4 flex flex-col">
                 <SheetHeader className="text-left pb-4 border-b border-border">
                   <SheetTitle className="text-sm font-semibold flex items-center gap-2">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#006B45] text-white text-xs font-bold">
                       T
                     </div>
                     Tridhata Ops
@@ -348,9 +465,57 @@ export const AppLayout: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* DEMO ROLE SWITCHER (Sangat Praktis untuk Presentasi Demo) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-medium bg-emerald-50/70 text-[#006B45] border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 px-2.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                  <span className="hidden sm:inline">Demo Peran:</span>
+                  <span className="font-semibold">{user?.role}</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 p-1.5 shadow-lg">
+                <DropdownMenuLabel className="px-2 py-1.5 text-xs font-bold text-muted-foreground">
+                  GANTI PERAN CEPAT (MODE DEMO)
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {DEMO_ACCOUNTS.map((acc) => {
+                  const isCurrent = user?.email === acc.email || user?.role === acc.role;
+                  return (
+                    <DropdownMenuItem
+                      key={acc.role}
+                      onClick={() => handleSwitchDemoAccount(acc)}
+                      className={cn(
+                        'flex flex-col items-start gap-0.5 p-2 rounded-md cursor-pointer text-xs mb-1',
+                        isCurrent ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-muted',
+                      )}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-semibold text-foreground flex items-center gap-1.5">
+                          {acc.badge}
+                        </span>
+                        {isCurrent && <Check className="h-3.5 w-3.5 text-[#006B45]" />}
+                      </div>
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        {acc.name}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground/80 leading-tight">
+                        {acc.desc}
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Sync Status Chip */}
-            <div className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-muted/40 text-[11px]">
+            <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-muted/40 text-[11px]">
               {syncStatus?.lastRun?.status === 'SUCCESS' ? (
                 <>
                   <CheckCircle className="h-3 w-3 text-status-safe" />
@@ -388,20 +553,22 @@ export const AppLayout: React.FC = () => {
                   variant="ghost"
                   className="flex items-center gap-2 h-8 px-2 text-xs font-medium hover:bg-muted"
                 >
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-[11px] font-semibold">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#006B45]/10 text-[#006B45] text-[11px] font-semibold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : 'U'}
                   </div>
                   <span className="hidden sm:inline max-w-[120px] truncate">{user?.name}</span>
-                  <Badge variant={getRoleBadgeVariant(user?.role)} className="text-[10px] px-1.5 py-0">
-                    {user?.role}
-                  </Badge>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-xs font-semibold leading-none">{user?.name}</p>
                     <p className="text-[11px] leading-none text-muted-foreground">{user?.email}</p>
+                    <div className="pt-1">
+                      <span className={cn('text-[9px] font-semibold px-1.5 py-0.5 rounded border inline-block', badgeInfo.className)}>
+                        {badgeInfo.label}
+                      </span>
+                    </div>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -425,7 +592,7 @@ export const AppLayout: React.FC = () => {
         </header>
 
         {/* Page Content Outlet - Independent Smooth Scroll */}
-        <main className="flex-1 overflow-y-auto min-w-0 p-4 sm:p-6 lg:p-8 scroll-smooth focus:outline-none">
+        <main className="flex-1 overflow-y-auto min-w-0 p-4 sm:p-6 lg:p-8 scroll-smooth focus:outline-none bg-[#f9fbf9]">
           <Outlet />
         </main>
       </div>
