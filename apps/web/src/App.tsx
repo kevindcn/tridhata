@@ -4,6 +4,7 @@ import { RequireAuth } from '@/features/auth/RequireAuth';
 import { RequirePermission } from '@/features/auth/RequirePermission';
 import { AppLayout } from '@/app/layout/AppLayout';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { AuthCallbackPage } from '@/features/auth/AuthCallbackPage';
 import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage';
 import { UsersPage } from '@/features/admin/UsersPage';
 import { AuditLogPage } from '@/features/admin/AuditLogPage';
@@ -21,6 +22,7 @@ export default function App() {
         <Routes>
           {/* Public Route */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
           {/* Authenticated Routes */}
           <Route element={<RequireAuth />}>

@@ -22,6 +22,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   login: (dto: LoginDto) => Promise<void>;
+  loginWithTicket: (ticket: string) => Promise<void>;
   logout: () => Promise<void>;
   changePassword: (dto: ChangePasswordDto) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -87,6 +88,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setUser(res.user);
   };
 
+  const loginWithTicket = async (ticket: string) => {
+    const res = await api<{ accessToken: string; user: AuthUser }>(
+      '/auth/google/exchange',
+      {
+        method: 'POST',
+        body: JSON.stringify({ ticket }),
+      },
+    );
+
+    setAccessToken(res.accessToken);
+    setUser(res.user);
+  };
+
   const logout = async () => {
     try {
       await api('/auth/logout', { method: 'POST' });
@@ -123,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         isLoading,
         login,
+        loginWithTicket,
         logout,
         changePassword,
         refreshUser: fetchCurrentUser,
