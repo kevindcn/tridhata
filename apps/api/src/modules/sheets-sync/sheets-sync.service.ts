@@ -332,6 +332,62 @@ export class SheetsSyncService {
         status: finalStatus,
         report,
       };
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Sinkronisasi lokasi ${location.code} gagal fatal: ${errMsg}`,
+      );
+
+      const failedReport: SyncReport =
+        report.entities.length > 0
+          ? report
+          : {
+              entities: [
+                {
+                  entity: 'PRODUCT',
+                  tab: 'UNKNOWN',
+                  status: 'FAILED',
+                  accepted: 0,
+                  rejected: 0,
+                  error: {
+                    code: 'SHEET_UNREACHABLE',
+                    message: errMsg,
+                  },
+                  rejectedRows: [],
+                },
+              ],
+            };
+
+      await this.prisma.syncRun.update({
+        where: { id: run.id },
+        data: {
+          status: 'FAILED',
+          finishedAt: new Date(),
+          rowsAccepted: totalAccepted,
+          rowsRejected: totalRejected,
+          report: failedReport as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      await this.auditService.record({
+        userId: triggeredById,
+        action: 'sync.failed',
+        entity: 'SyncRun',
+        entityId: run.id,
+        after: {
+          locationId,
+          trigger,
+          status: 'FAILED',
+          error: errMsg,
+        },
+        ctx,
+      });
+
+      return {
+        runId: run.id,
+        status: 'FAILED',
+        report: failedReport,
+      };
     } finally {
       // Always release advisory lock
       await this.prisma.$queryRaw`SELECT pg_advisory_unlock(hashtext(${'sync:' + locationId}))`;
