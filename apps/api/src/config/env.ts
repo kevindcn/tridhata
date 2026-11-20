@@ -31,6 +31,9 @@ export const envSchema = z.object({
   SYNC_STALE_MINUTES: z.coerce.number().default(120),
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().min(10).optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CALLBACK_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
