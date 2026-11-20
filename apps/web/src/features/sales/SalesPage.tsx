@@ -425,25 +425,28 @@ export const SalesPage: React.FC = () => {
             ) : data?.daily && data.daily.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data.daily} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-border/60" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
                   <XAxis
                     dataKey="date"
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(v: string) => v.slice(8, 10)}
-                    className="text-[11px] text-muted-foreground"
+                    className="text-[11px]"
+                    tick={{ fill: '#64748B' }}
                   />
                   <YAxis
                     tickLine={false}
                     axisLine={false}
-                    className="text-[11px] text-muted-foreground tabular-nums"
+                    className="text-[11px] tabular-nums"
+                    tick={{ fill: '#64748B' }}
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'var(--card)',
-                      borderColor: 'var(--border)',
+                      backgroundColor: '#FFFFFF',
+                      borderColor: '#E5E7EB',
                       borderRadius: '8px',
                       fontSize: '12px',
+                      color: '#1F2937',
                     }}
                     formatter={(val) => [`${formatInt(Number(val))} Pcs`, 'Kuantitas']}
                     labelFormatter={(label) => `Tanggal: ${label}`}
@@ -451,10 +454,10 @@ export const SalesPage: React.FC = () => {
                   <Area
                     type="monotone"
                     dataKey="qty"
-                    stroke="var(--primary)"
+                    stroke="#006B45"
                     strokeWidth={2}
-                    fill="var(--accent)"
-                    fillOpacity={0.4}
+                    fill="#E8F4EC"
+                    fillOpacity={0.6}
                   />
                 </AreaChart>
               </ResponsiveContainer>

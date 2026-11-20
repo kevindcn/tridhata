@@ -85,7 +85,22 @@ export class SheetsSyncService {
     let totalRejected = 0;
 
     try {
-      const spreadsheetId = location.spreadsheetId;
+      let spreadsheetId = location.spreadsheetId;
+      if (!spreadsheetId) {
+        const envSheetId =
+          location.code === 'BOGOR'
+            ? process.env.SHEET_ID_BOGOR
+            : location.code === 'NGANJUK'
+            ? process.env.SHEET_ID_NGANJUK
+            : null;
+        if (envSheetId) {
+          spreadsheetId = envSheetId;
+          await this.prisma.location.update({
+            where: { id: location.id },
+            data: { spreadsheetId: envSheetId },
+          });
+        }
+      }
       if (!spreadsheetId) {
         throw new Error(
           `ID Spreadsheet belum dikonfigurasi untuk lokasi ${location.code}`,
@@ -132,9 +147,13 @@ export class SheetsSyncService {
         try {
           rows = await this.sheetsClient.getValues(spreadsheetId, `'${tab}'`);
         } catch (fetchErr: unknown) {
-          const errMsg =
+          const rawErrMsg =
             fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-          this.logger.error(`Gagal mengambil tab '${tab}': ${errMsg}`);
+          const errMsg =
+            rawErrMsg.includes('DECODER') || rawErrMsg.includes('unsupported')
+              ? 'Kredensial Google Service Account tidak valid (Private Key belum dikonfigurasi dengan benar di berkas .env)'
+              : rawErrMsg;
+          this.logger.error(`Gagal mengambil tab '${tab}': ${rawErrMsg}`);
           report.entities.push({
             entity,
             tab,

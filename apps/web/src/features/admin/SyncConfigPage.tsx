@@ -406,6 +406,42 @@ export const SyncConfigPage: React.FC = () => {
         </Card>
       </div>
 
+      {/* Failed Entities Alert (SPEC 9.4 Poin 10) */}
+      {latestReport?.entities?.some((e) => e.status === 'FAILED') && (
+        <Card className="shadow-xs overflow-hidden border-destructive/30">
+          <CardHeader className="p-4 pb-3 bg-destructive/10 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-semibold text-destructive flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4" />
+                Kendala Sinkronisasi pada Entitas
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Berikut rincian kendala sinkronisasi yang terdeteksi pada tab / entitas terkait.
+              </p>
+            </div>
+          </CardHeader>
+          <div className="border-t border-border divide-y divide-border">
+            {latestReport.entities
+              .filter((e) => e.status === 'FAILED')
+              .map((ent, idx) => (
+                <div key={idx} className="p-3 text-xs flex items-start gap-2.5">
+                  <Badge variant="critical" className="shrink-0 mt-0.5">
+                    {ent.entity}
+                  </Badge>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-foreground">
+                      Tab: <code className="font-mono text-[11px] bg-muted px-1 py-0.5 rounded">{ent.tab}</code>
+                    </span>
+                    <p className="text-destructive mt-0.5 font-medium">
+                      {ent.error?.message || 'Gagal sinkronisasi data sheet'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </Card>
+      )}
+
       {/* Sheet Mappings Table */}
       <Card className="shadow-xs overflow-hidden">
         <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">

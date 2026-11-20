@@ -227,7 +227,7 @@ export const AppLayout: React.FC = () => {
                       'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors duration-150',
                       isActive
                         ? 'bg-accent text-accent-foreground font-medium'
-                        : 'text-foreground/80 hover:bg-muted hover:text-foreground',
+                        : 'text-[#475569] hover:bg-muted hover:text-foreground',
                     )
                   }
                 >

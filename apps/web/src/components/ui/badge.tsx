@@ -16,6 +16,7 @@ const badgeVariants = cva(
         critical: 'bg-status-critical-bg text-status-critical border border-status-critical/30',
         empty: 'bg-status-empty-bg text-status-empty border border-status-empty/30',
         warning: 'bg-warning-bg text-warning border border-warning/30',
+        info: 'bg-info-bg text-info border border-info/30',
       },
     },
     defaultVariants: {
