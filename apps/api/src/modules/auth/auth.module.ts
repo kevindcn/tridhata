@@ -5,6 +5,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 
+import { GoogleOAuthService } from './google-oauth.service';
+
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -18,7 +20,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, JwtStrategy, GoogleOAuthService],
+  exports: [AuthService, JwtModule, GoogleOAuthService],
 })
 export class AuthModule {}

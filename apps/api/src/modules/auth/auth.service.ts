@@ -391,12 +391,12 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  private buildAuthUser(user: {
+  buildAuthUser(user: {
     id: string;
     name: string;
     email: string;
     role: { name: string; permissions: string[] };
-    extraPermissions: string[];
+    extraPermissions?: string[];
     access: { locationId: string }[];
     defaultLocationId: string | null;
     mustChangePassword: boolean;
