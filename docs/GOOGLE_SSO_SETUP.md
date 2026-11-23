@@ -84,3 +84,4 @@ Sistem Tridhata menerapkan kebijakan keamanan **Pre-provisioned Only**:
    - Jika email terdaftar & aktif: pengguna langsung masuk tanpa harus mengubah password manual.
    - Jika email belum didaftarkan: login ditolak dengan notifikasi *"Akun Google (email) belum terdaftar dalam sistem Tridhata. Silakan hubungi Administrator."*
    - Jika akun berstatus nonaktif: login ditolak dengan notifikasi *"Akun Anda sedang dinonaktifkan."*
+

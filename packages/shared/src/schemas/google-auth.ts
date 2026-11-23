@@ -13,3 +13,4 @@ export type GoogleAuthErrorCode =
   | 'GOOGLE_AUTH_CANCELLED'
   | 'EMAIL_NOT_VERIFIED'
   | 'AUTH_FAILED';
+

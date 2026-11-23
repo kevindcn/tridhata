@@ -29,3 +29,4 @@ describe('envSchema Google OAuth configuration', () => {
     expect(parsed.GOOGLE_CALLBACK_URL).toBeUndefined();
   });
 });
+
