@@ -26,4 +26,9 @@ class Item extends Model
         'is_raw_material' => 'boolean',
         'is_active' => 'boolean',
     ];
+
+    public function requestItems(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RequestItem::class, 'item_id');
+    }
 }

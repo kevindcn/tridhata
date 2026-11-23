@@ -78,4 +78,20 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->belongsToMany(Location::class, 'location_user');
     }
+
+    /**
+     * Requests submitted by this user.
+     */
+    public function requests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Request::class, 'requester_id');
+    }
+
+    /**
+     * Approvals performed by this user.
+     */
+    public function approvals(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Approval::class, 'approver_id');
+    }
 }

@@ -33,4 +33,12 @@ class Location extends Model
     {
         return $this->hasMany(User::class, 'default_location_id');
     }
+
+    /**
+     * Requests submitted for this location.
+     */
+    public function requests(): HasMany
+    {
+        return $this->hasMany(Request::class, 'location_id');
+    }
 }

@@ -52,6 +52,7 @@ class RoleAndPermissionSeeder extends Seeder
             'view_finance',
             'manage_finance',
             'approve_finance',
+            'approve_director',
 
             // Administration & Users
             'view_users',
@@ -94,6 +95,14 @@ class RoleAndPermissionSeeder extends Seeder
                 'view_inventory', 'approve_requests',
                 'view_sales', 'manage_sales',
                 'view_finance', 'manage_finance', 'approve_finance',
+                'view_audit_logs',
+            ],
+
+            'director' => [
+                'view_master',
+                'view_inventory', 'approve_requests',
+                'view_sales', 'manage_sales',
+                'view_finance', 'manage_finance', 'approve_director',
                 'view_audit_logs',
             ],
 
