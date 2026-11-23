@@ -53,7 +53,7 @@ return new class extends Migration
             $table->foreignId('movement_id')->constrained('stock_movements')->cascadeOnDelete();
             $table->foreignId('item_id')->nullable()->constrained('items')->nullOnDelete();
             $table->foreignId('product_id')->nullable()->constrained('products')->nullOnDelete();
-            $table->decimal('qty', 18, 2);
+            $table->decimal('qty', 18, 4);
             $table->string('unit')->default('pcs');
             $table->decimal('unit_price', 18, 2)->default(0);
             $table->decimal('total_price', 18, 2)->default(0);

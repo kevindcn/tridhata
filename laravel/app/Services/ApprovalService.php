@@ -202,6 +202,8 @@ class ApprovalService
     public function processDecision(ErpRequest $request, User $approver, int $step, string $decision, ?string $notes = null): Approval
     {
         return DB::transaction(function () use ($request, $approver, $step, $decision, $notes) {
+            $request = ErpRequest::where('id', $request->id)->lockForUpdate()->firstOrFail();
+
             $normalizedDecision = strtoupper($decision);
             if (! in_array($normalizedDecision, ['APPROVED', 'REJECTED'])) {
                 throw new \InvalidArgumentException("Keputusan harus APPROVED atau REJECTED.");

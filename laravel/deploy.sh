@@ -31,7 +31,11 @@ php artisan icons:cache
 echo "[5/7] Verifying storage symlink..."
 php artisan storage:link || true
 
-echo "[6/7] Restarting queue worker processes..."
+echo "[6/7] Setting permissions for storage and bootstrap/cache..."
+chown -R www-data:www-data storage bootstrap/cache || true
+chmod -R 775 storage bootstrap/cache || true
+
+echo "[7/7] Restarting queue worker processes..."
 if command -v supervisorctl &> /dev/null; then
     supervisorctl restart tridhata-worker:* || sudo supervisorctl restart tridhata-worker:*
     echo "Supervisor queue workers restarted."

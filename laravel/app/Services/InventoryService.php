@@ -270,6 +270,11 @@ class InventoryService
     public function applyStockOpname(StockOpname $opname): StockMovement
     {
         return DB::transaction(function () use ($opname) {
+            $opname = StockOpname::where('id', $opname->id)->lockForUpdate()->firstOrFail();
+            if ($opname->status === 'APPLIED') {
+                throw new \InvalidArgumentException('Stock opname ini sudah pernah diterapkan.');
+            }
+
             $opname->loadMissing(['items.item', 'items.product']);
 
             $userId = auth()->id() ?? $opname->created_by;

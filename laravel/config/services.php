@@ -37,4 +37,8 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'ocr' => [
+        'python_path' => env('PYTHON_BINARY', 'python3'),
+    ],
+
 ];
