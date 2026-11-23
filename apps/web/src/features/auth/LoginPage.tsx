@@ -111,6 +111,7 @@ export const LoginPage: React.FC = () => {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginDto>({
     resolver: zodResolver(loginSchema),
@@ -119,6 +120,21 @@ export const LoginPage: React.FC = () => {
       password: '',
     },
   });
+
+  const DEMO_PRESETS = [
+    { label: '👑 Owner / Direktur', email: 'owner@tridhata.com', role: 'OWNER' },
+    { label: '💼 Finance & Kasir', email: 'budi@tridhata.com', role: 'FINANCE' },
+    { label: '📊 Sales Marketing', email: 'sales@tridhata.com', role: 'SALES_OFFICE' },
+    { label: '🌾 Sales Lapang', email: 'agronomis@tridhata.com', role: 'SALES_FIELD' },
+    { label: '📦 Gudang & Logistik', email: 'gudang@tridhata.com', role: 'WAREHOUSE' },
+    { label: '⚙️ Admin Utama', email: 'admin@tridhata.com', role: 'ADMIN' },
+  ];
+
+  const handleQuickDemoLogin = (email: string) => {
+    setValue('email', email);
+    setValue('password', 'AdminTridhata2026!');
+    onSubmit({ email, password: 'AdminTridhata2026!' });
+  };
 
   const onSubmit = async (data: LoginDto) => {
     setErrorMessage(null);
@@ -403,6 +419,29 @@ export const LoginPage: React.FC = () => {
               </>
             )}
           </button>
+
+          {/* Quick Demo Accounts Selection */}
+          <div className="mt-6 pt-5 border-t border-[#e5e7eb]">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2.5 text-center">
+              Akses Cepat Mode Demo (1-Click Login)
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {DEMO_PRESETS.map((p) => (
+                <button
+                  key={p.role}
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleQuickDemoLogin(p.email)}
+                  className="flex items-center justify-center text-[11px] font-medium py-1.5 px-2 rounded-lg border border-border bg-muted/40 hover:bg-emerald-50 hover:border-emerald-300 hover:text-[#0b5e34] transition-colors truncate disabled:opacity-50 cursor-pointer"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-center text-muted-foreground/80 mt-2">
+              Sandi default: <code className="bg-muted px-1 py-0.5 rounded font-mono">AdminTridhata2026!</code>
+            </p>
+          </div>
         </div>
       </div>
     </div>

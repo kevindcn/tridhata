@@ -163,10 +163,10 @@ export const SyncConfigPage: React.FC = () => {
       const updatedList = mappings.map((m) =>
         m.id === editingMapping.id
           ? {
-              ...m,
-              tab: editTab.trim(),
-              sourceHeader: editHeader.trim(),
-            }
+            ...m,
+            tab: editTab.trim(),
+            sourceHeader: editHeader.trim(),
+          }
           : m,
       );
 
@@ -394,9 +394,8 @@ export const SyncConfigPage: React.FC = () => {
             <XCircle className="h-4 w-4 text-status-critical" />
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className={`text-xl font-bold tracking-tight tabular-nums ${
-              (syncStatus?.lastRun?.rowsRejected || 0) > 0 ? 'text-status-critical' : 'text-foreground'
-            }`}>
+            <div className={`text-xl font-bold tracking-tight tabular-nums ${(syncStatus?.lastRun?.rowsRejected || 0) > 0 ? 'text-status-critical' : 'text-foreground'
+              }`}>
               {formatInt(syncStatus?.lastRun?.rowsRejected || 0)} Baris
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">
