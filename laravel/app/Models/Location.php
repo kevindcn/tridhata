@@ -57,4 +57,20 @@ class Location extends Model
     {
         return $this->hasMany(ProductionSchedule::class, 'location_id');
     }
+
+    /**
+     * Sales orders in this location.
+     */
+    public function salesOrders(): HasMany
+    {
+        return $this->hasMany(SalesOrder::class, 'location_id');
+    }
+
+    /**
+     * Deliveries from this location.
+     */
+    public function deliveries(): HasMany
+    {
+        return $this->hasMany(Delivery::class, 'location_id');
+    }
 }

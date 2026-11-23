@@ -46,4 +46,9 @@ class Product extends Model
     {
         return $this->hasMany(StockLevel::class);
     }
+
+    public function salesOrderItems(): HasMany
+    {
+        return $this->hasMany(SalesOrderItem::class);
+    }
 }

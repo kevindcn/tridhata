@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Services\DocumentPdfService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -99,6 +100,15 @@ class ProductResource extends Resource
                     ->label('Status Aktif'),
             ])
             ->actions([
+                Tables\Actions\Action::make('printQrLabel')
+                    ->label('Cetak Label QR (PDF)')
+                    ->icon('heroicon-o-qr-code')
+                    ->color('info')
+                    ->action(function (Product $record) {
+                        $pdfPath = app(DocumentPdfService::class)->generateQrLabelPdf($record);
+
+                        return response()->download(storage_path('app/public/' . $pdfPath), "Label-QR-{$record->sku}.pdf");
+                    }),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])
