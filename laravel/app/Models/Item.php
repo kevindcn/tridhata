@@ -1,0 +1,29 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Item extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'sku',
+        'name',
+        'category',
+        'unit',
+        'min_stock',
+        'safety_stock',
+        'is_raw_material',
+        'is_active',
+    ];
+
+    protected $casts = [
+        'min_stock' => 'integer',
+        'safety_stock' => 'integer',
+        'is_raw_material' => 'boolean',
+        'is_active' => 'boolean',
+    ];
+}
