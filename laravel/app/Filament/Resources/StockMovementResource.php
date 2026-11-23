@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\StockMovementType;
 use App\Filament\Resources\StockMovementResource\Pages;
+use App\Models\Location;
 use App\Models\StockMovement;
 use App\Services\InventoryService;
 use Filament\Forms;
@@ -12,6 +13,7 @@ use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 
 class StockMovementResource extends Resource
@@ -28,6 +30,35 @@ class StockMovementResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Mutasi & Perpindahan Stok';
 
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+
+        if (! $user) {
+            return $query;
+        }
+
+        if (method_exists($user, 'hasRole') && $user->hasRole('super_admin')) {
+            return $query;
+        }
+
+        $locationIds = $user->locations()->pluck('locations.id')->all();
+        if ($user->default_location_id) {
+            $locationIds[] = $user->default_location_id;
+        }
+        $locationIds = array_unique(array_filter($locationIds));
+
+        if (empty($locationIds)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function (Builder $q) use ($locationIds) {
+            $q->whereIn('location_id', $locationIds)
+                ->orWhereIn('target_location_id', $locationIds);
+        });
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -41,7 +72,37 @@ class StockMovementResource extends Resource
                             ->live(),
                         Forms\Components\Select::make('location_id')
                             ->label('Lokasi Asal / Gudang')
-                            ->relationship('location', 'name')
+                            ->options(function () {
+                                $user = auth()->user();
+                                if (! $user || (method_exists($user, 'hasRole') && $user->hasRole('super_admin'))) {
+                                    return Location::pluck('name', 'id');
+                                }
+                                $locations = $user->locations;
+                                if ($user->default_location_id && ! $locations->contains('id', $user->default_location_id)) {
+                                    $defaultLoc = Location::find($user->default_location_id);
+                                    if ($defaultLoc) {
+                                        $locations = $locations->push($defaultLoc);
+                                    }
+                                }
+                                return $locations->pluck('name', 'id');
+                            })
+                            ->default(fn () => auth()->user()?->default_location_id ?? auth()->user()?->locations()->first()?->id)
+                            ->rules([
+                                fn (): \Closure => function (string $attribute, $value, \Closure $fail) {
+                                    $user = auth()->user();
+                                    if (! $user || (method_exists($user, 'hasRole') && $user->hasRole('super_admin'))) {
+                                        return;
+                                    }
+                                    $accessibleLocationIds = $user->locations()->pluck('locations.id')->all();
+                                    if ($user->default_location_id) {
+                                        $accessibleLocationIds[] = $user->default_location_id;
+                                    }
+                                    $accessibleLocationIds = array_unique(array_filter($accessibleLocationIds));
+                                    if (! in_array((int) $value, $accessibleLocationIds)) {
+                                        $fail('Anda tidak memiliki akses ke lokasi gudang yang dipilih.');
+                                    }
+                                },
+                            ])
                             ->searchable()
                             ->preload()
                             ->required(),
@@ -91,7 +152,7 @@ class StockMovementResource extends Resource
                                     ->label('Jumlah')
                                     ->numeric()
                                     ->required()
-                                    ->minValue(1),
+                                    ->minValue(0.0001),
                                 Forms\Components\TextInput::make('unit')
                                     ->label('Satuan')
                                     ->default('kg')

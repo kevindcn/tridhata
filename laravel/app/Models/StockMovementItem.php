@@ -21,7 +21,7 @@ class StockMovementItem extends Model
     ];
 
     protected $casts = [
-        'qty' => 'decimal:2',
+        'qty' => 'float',
         'unit_price' => 'decimal:2',
         'total_price' => 'decimal:2',
     ];

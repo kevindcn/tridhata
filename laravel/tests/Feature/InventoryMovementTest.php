@@ -104,7 +104,7 @@ class InventoryMovementTest extends TestCase
         $service = app(InventoryService::class);
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessageMatches('/Insufficient stock/i');
+        $this->expectExceptionMessageMatches('/Stok tidak mencukupi/i');
 
         $service->recordMovement([
             'type' => StockMovementType::OUT,
@@ -312,6 +312,7 @@ class InventoryMovementTest extends TestCase
     {
         $user = User::factory()->create(['email' => 'creator@tridhata.com', 'active' => true]);
         $location = Location::factory()->create(['code' => 'BOGOR']);
+        $user->locations()->attach($location);
         $item = Item::factory()->create(['sku' => 'TEST-01']);
 
         $this->actingAs($user);
@@ -338,5 +339,169 @@ class InventoryMovementTest extends TestCase
             'location_id' => $location->id,
             'qty' => 75,
         ]);
+    }
+
+    public function test_transfer_missing_target_throws_exception(): void
+    {
+        $location = Location::factory()->create(['code' => 'BOGOR']);
+        $item = Item::factory()->create();
+        $service = app(InventoryService::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Lokasi tujuan wajib dipilih untuk mutasi transfer.');
+
+        $service->recordMovement([
+            'type' => StockMovementType::TRANSFER,
+            'location_id' => $location->id,
+            'target_location_id' => null,
+            'date' => now()->toDateString(),
+            'items' => [
+                ['item_id' => $item->id, 'qty' => 10, 'unit' => 'kg']
+            ]
+        ]);
+    }
+
+    public function test_transfer_same_location_throws_exception(): void
+    {
+        $location = Location::factory()->create(['code' => 'BOGOR']);
+        $item = Item::factory()->create();
+        $service = app(InventoryService::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Lokasi tujuan tidak boleh sama dengan lokasi asal.');
+
+        $service->recordMovement([
+            'type' => StockMovementType::TRANSFER,
+            'location_id' => $location->id,
+            'target_location_id' => $location->id,
+            'date' => now()->toDateString(),
+            'items' => [
+                ['item_id' => $item->id, 'qty' => 10, 'unit' => 'kg']
+            ]
+        ]);
+    }
+
+    public function test_fractional_decimal_quantity_is_properly_preserved(): void
+    {
+        $location = Location::factory()->create(['code' => 'BOGOR']);
+        $item = Item::factory()->create(['unit' => 'kg']);
+        $service = app(InventoryService::class);
+
+        $service->recordMovement([
+            'type' => StockMovementType::IN,
+            'location_id' => $location->id,
+            'date' => now()->toDateString(),
+            'items' => [
+                ['item_id' => $item->id, 'qty' => 2.5, 'unit' => 'kg']
+            ]
+        ]);
+
+        $this->assertEquals(2.5, StockLevel::where('item_id', $item->id)->where('location_id', $location->id)->value('qty'));
+
+        $service->recordMovement([
+            'type' => StockMovementType::OUT,
+            'location_id' => $location->id,
+            'date' => now()->toDateString(),
+            'items' => [
+                ['item_id' => $item->id, 'qty' => 0.75, 'unit' => 'kg']
+            ]
+        ]);
+
+        $this->assertEquals(1.75, StockLevel::where('item_id', $item->id)->where('location_id', $location->id)->value('qty'));
+    }
+
+    public function test_negative_or_zero_quantity_is_rejected(): void
+    {
+        $location = Location::factory()->create(['code' => 'BOGOR']);
+        $item = Item::factory()->create();
+        $service = app(InventoryService::class);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Jumlah barang harus lebih besar dari 0.');
+
+        $service->recordMovement([
+            'type' => StockMovementType::IN,
+            'location_id' => $location->id,
+            'date' => now()->toDateString(),
+            'items' => [
+                ['item_id' => $item->id, 'qty' => -5, 'unit' => 'kg']
+            ]
+        ]);
+    }
+
+    public function test_branch_scoping_restricts_unauthorized_locations(): void
+    {
+        $bogor = Location::factory()->create(['code' => 'BOGOR', 'name' => 'Gudang Bogor']);
+        $nganjuk = Location::factory()->create(['code' => 'NGANJUK', 'name' => 'Gudang Nganjuk']);
+        $item = Item::factory()->create();
+
+        $bogorUser = User::factory()->create(['email' => 'bogor.staff@tridhata.com', 'active' => true]);
+        $bogorUser->locations()->attach($bogor);
+
+        $service = app(InventoryService::class);
+
+        $movementBogor = $service->recordMovement([
+            'type' => StockMovementType::IN,
+            'location_id' => $bogor->id,
+            'date' => now()->toDateString(),
+            'items' => [['item_id' => $item->id, 'qty' => 10, 'unit' => 'kg']]
+        ]);
+
+        $movementNganjuk = $service->recordMovement([
+            'type' => StockMovementType::IN,
+            'location_id' => $nganjuk->id,
+            'date' => now()->toDateString(),
+            'items' => [['item_id' => $item->id, 'qty' => 20, 'unit' => 'kg']]
+        ]);
+
+        $this->actingAs($bogorUser);
+
+        $scopedMovements = StockMovementResource::getEloquentQuery()->pluck('id')->all();
+
+        $this->assertContains($movementBogor->id, $scopedMovements);
+        $this->assertNotContains($movementNganjuk->id, $scopedMovements);
+
+        // Submitting movement for unauthorized branch halts with danger notification
+        \Livewire\Livewire::test(StockMovementResource\Pages\CreateStockMovement::class)
+            ->fillForm([
+                'type' => StockMovementType::IN->value,
+                'location_id' => $nganjuk->id,
+                'date' => now()->toDateString(),
+                'items' => [
+                    ['item_id' => $item->id, 'qty' => 5, 'unit' => 'kg']
+                ],
+            ])
+            ->call('create')
+            ->assertHasErrors();
+    }
+
+    public function test_low_stock_alert_widget_renders_scoped_data(): void
+    {
+        $bogor = Location::factory()->create(['code' => 'BOGOR']);
+        $nganjuk = Location::factory()->create(['code' => 'NGANJUK']);
+        $itemBogor = Item::factory()->create(['name' => 'Barang Bogor Kritis']);
+        $itemNganjuk = Item::factory()->create(['name' => 'Barang Nganjuk Kritis']);
+
+        StockLevel::create([
+            'item_id' => $itemBogor->id,
+            'location_id' => $bogor->id,
+            'qty' => 2,
+            'min_stock' => 10,
+        ]);
+
+        StockLevel::create([
+            'item_id' => $itemNganjuk->id,
+            'location_id' => $nganjuk->id,
+            'qty' => 1,
+            'min_stock' => 10,
+        ]);
+
+        $user = User::factory()->create(['active' => true]);
+        $user->locations()->attach($bogor);
+        $this->actingAs($user);
+
+        \Livewire\Livewire::test(\App\Filament\Widgets\LowStockAlertWidget::class)
+            ->assertSee('Barang Bogor Kritis')
+            ->assertDontSee('Barang Nganjuk Kritis');
     }
 }

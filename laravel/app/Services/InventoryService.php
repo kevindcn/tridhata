@@ -29,14 +29,27 @@ class InventoryService
                 ? $data['type']
                 : StockMovementType::from((string) $data['type']);
 
+            $locationId = (int) $data['location_id'];
+            $targetLocationId = ! empty($data['target_location_id']) ? (int) $data['target_location_id'] : null;
+
+            // Transfer validation & guard
+            if ($type === StockMovementType::TRANSFER) {
+                if (empty($targetLocationId)) {
+                    throw new \InvalidArgumentException('Lokasi tujuan wajib dipilih untuk mutasi transfer.');
+                }
+                if ($locationId === $targetLocationId) {
+                    throw new \InvalidArgumentException('Lokasi tujuan tidak boleh sama dengan lokasi asal.');
+                }
+            }
+
             $code = $data['code'] ?? $this->generateMovementCode($type);
             $userId = $data['created_by'] ?? auth()->id();
 
             $movement = StockMovement::create([
                 'code' => $code,
                 'type' => $type,
-                'location_id' => $data['location_id'],
-                'target_location_id' => $data['target_location_id'] ?? null,
+                'location_id' => $locationId,
+                'target_location_id' => $targetLocationId,
                 'reference_type' => $data['reference_type'] ?? null,
                 'reference_id' => $data['reference_id'] ?? null,
                 'date' => $data['date'] ?? now()->toDateString(),
@@ -48,35 +61,28 @@ class InventoryService
 
             $items = $data['items'] ?? [];
 
-            foreach ($items as $itemData) {
-                $itemId = $itemData['item_id'] ?? null;
-                $productId = $itemData['product_id'] ?? null;
-                $qty = (float) $itemData['qty'];
-                $unit = $itemData['unit'] ?? 'pcs';
-                $unitPrice = (float) ($itemData['unit_price'] ?? 0);
-                $totalPrice = (float) ($itemData['total_price'] ?? ($qty * $unitPrice));
-
-                // 1. Lock or initialize source location StockLevel
-                $stockLevel = StockLevel::where('location_id', $movement->location_id)
+            // Helper to lock or create StockLevel for given location & item/product
+            $getOrLockStockLevel = function (int $locId, ?int $itemId, ?int $productId): StockLevel {
+                $stockLevel = StockLevel::where('location_id', $locId)
                     ->when($itemId, fn($q) => $q->where('item_id', $itemId))
                     ->when($productId, fn($q) => $q->where('product_id', $productId))
                     ->lockForUpdate()
                     ->first();
 
-                if (!$stockLevel) {
+                if (! $stockLevel) {
                     $minStock = 0;
                     $safetyStock = 0;
                     if ($itemId) {
                         $masterItem = Item::find($itemId);
-                        $minStock = $masterItem?->min_stock ?? 0;
-                        $safetyStock = $masterItem?->safety_stock ?? 0;
+                        $minStock = (float) ($masterItem?->min_stock ?? 0);
+                        $safetyStock = (float) ($masterItem?->safety_stock ?? 0);
                     } elseif ($productId) {
                         $masterProduct = Product::find($productId);
-                        $minStock = $masterProduct?->min_stock ?? 0;
+                        $minStock = (float) ($masterProduct?->min_stock ?? 0);
                     }
 
                     $stockLevel = StockLevel::create([
-                        'location_id' => $movement->location_id,
+                        'location_id' => $locId,
                         'item_id' => $itemId,
                         'product_id' => $productId,
                         'qty' => 0,
@@ -86,73 +92,83 @@ class InventoryService
                     ]);
                 }
 
-                // 2. Apply movement type logic
-                switch ($type) {
-                    case StockMovementType::IN:
-                    case StockMovementType::RETURN:
-                        $stockLevel->qty += (int) $qty;
-                        $stockLevel->version += 1;
-                        $stockLevel->save();
-                        break;
+                return $stockLevel;
+            };
 
-                    case StockMovementType::OUT:
-                    case StockMovementType::REJECT:
-                        if ($stockLevel->qty < $qty) {
-                            $identifier = $itemId ? "item {$itemId}" : "product {$productId}";
-                            throw new \InvalidArgumentException(
-                                "Insufficient stock for {$identifier}. Available: {$stockLevel->qty}, requested: {$qty}"
-                            );
-                        }
-                        $stockLevel->qty -= (int) $qty;
-                        $stockLevel->version += 1;
-                        $stockLevel->save();
-                        break;
+            foreach ($items as $itemData) {
+                $itemId = ! empty($itemData['item_id']) ? (int) $itemData['item_id'] : null;
+                $productId = ! empty($itemData['product_id']) ? (int) $itemData['product_id'] : null;
+                $qty = round((float) ($itemData['qty'] ?? 0), 4);
+                $unit = $itemData['unit'] ?? 'pcs';
+                $unitPrice = (float) ($itemData['unit_price'] ?? 0);
+                $totalPrice = (float) ($itemData['total_price'] ?? ($qty * $unitPrice));
 
-                    case StockMovementType::TRANSFER:
-                        if ($stockLevel->qty < $qty) {
-                            $identifier = $itemId ? "item {$itemId}" : "product {$productId}";
-                            throw new \InvalidArgumentException(
-                                "Insufficient stock for {$identifier} at source warehouse. Available: {$stockLevel->qty}, requested: {$qty}"
-                            );
-                        }
-                        $stockLevel->qty -= (int) $qty;
-                        $stockLevel->version += 1;
-                        $stockLevel->save();
-
-                        // Target location lock or create
-                        if ($movement->target_location_id) {
-                            $targetLevel = StockLevel::where('location_id', $movement->target_location_id)
-                                ->when($itemId, fn($q) => $q->where('item_id', $itemId))
-                                ->when($productId, fn($q) => $q->where('product_id', $productId))
-                                ->lockForUpdate()
-                                ->first();
-
-                            if (!$targetLevel) {
-                                $targetLevel = StockLevel::create([
-                                    'location_id' => $movement->target_location_id,
-                                    'item_id' => $itemId,
-                                    'product_id' => $productId,
-                                    'qty' => 0,
-                                    'min_stock' => $stockLevel->min_stock,
-                                    'safety_stock' => $stockLevel->safety_stock,
-                                    'version' => 1,
-                                ]);
-                            }
-
-                            $targetLevel->qty += (int) $qty;
-                            $targetLevel->version += 1;
-                            $targetLevel->save();
-                        }
-                        break;
-
-                    case StockMovementType::ADJUSTMENT:
-                        $stockLevel->qty += (int) $qty;
-                        $stockLevel->version += 1;
-                        $stockLevel->save();
-                        break;
+                // Positive quantity validation
+                if ($qty <= 0) {
+                    throw new \InvalidArgumentException('Jumlah barang harus lebih besar dari 0.');
                 }
 
-                // 3. Record item record
+                $entityName = $itemId
+                    ? (Item::find($itemId)?->name ?? "Item #{$itemId}")
+                    : (Product::find($productId)?->name ?? "Produk #{$productId}");
+
+                // Apply movement logic with deterministic locking
+                if ($type === StockMovementType::TRANSFER) {
+                    // Deterministic lock ordering to avoid relational deadlocks
+                    $firstLocId = min($locationId, $targetLocationId);
+                    $secondLocId = max($locationId, $targetLocationId);
+
+                    $firstLevel = $getOrLockStockLevel($firstLocId, $itemId, $productId);
+                    $secondLevel = $getOrLockStockLevel($secondLocId, $itemId, $productId);
+
+                    $sourceLevel = ($locationId === $firstLocId) ? $firstLevel : $secondLevel;
+                    $targetLevel = ($targetLocationId === $firstLocId) ? $firstLevel : $secondLevel;
+
+                    if ($sourceLevel->qty < $qty) {
+                        throw new \InvalidArgumentException(
+                            "Stok tidak mencukupi untuk {$entityName} di gudang asal. Stok tersedia: {$sourceLevel->qty}, jumlah diminta: {$qty}."
+                        );
+                    }
+
+                    $sourceLevel->qty = round($sourceLevel->qty - $qty, 4);
+                    $sourceLevel->version += 1;
+                    $sourceLevel->save();
+
+                    $targetLevel->qty = round($targetLevel->qty + $qty, 4);
+                    $targetLevel->version += 1;
+                    $targetLevel->save();
+                } else {
+                    $stockLevel = $getOrLockStockLevel($locationId, $itemId, $productId);
+
+                    switch ($type) {
+                        case StockMovementType::IN:
+                        case StockMovementType::RETURN:
+                            $stockLevel->qty = round($stockLevel->qty + $qty, 4);
+                            $stockLevel->version += 1;
+                            $stockLevel->save();
+                            break;
+
+                        case StockMovementType::OUT:
+                        case StockMovementType::REJECT:
+                            if ($stockLevel->qty < $qty) {
+                                throw new \InvalidArgumentException(
+                                    "Stok tidak mencukupi untuk {$entityName}. Stok tersedia: {$stockLevel->qty}, jumlah diminta: {$qty}."
+                                );
+                            }
+                            $stockLevel->qty = round($stockLevel->qty - $qty, 4);
+                            $stockLevel->version += 1;
+                            $stockLevel->save();
+                            break;
+
+                        case StockMovementType::ADJUSTMENT:
+                            $stockLevel->qty = round($stockLevel->qty + $qty, 4);
+                            $stockLevel->version += 1;
+                            $stockLevel->save();
+                            break;
+                    }
+                }
+
+                // Record movement line item
                 $movement->items()->create([
                     'item_id' => $itemId,
                     'product_id' => $productId,
@@ -163,7 +179,7 @@ class InventoryService
                 ]);
             }
 
-            // 4. Log Spatie Activity
+            // Log Spatie Activity
             $typeString = $type->value;
             activity('inventory')
                 ->performedOn($movement)

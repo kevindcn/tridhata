@@ -22,9 +22,9 @@ class StockLevel extends Model
     ];
 
     protected $casts = [
-        'qty' => 'integer',
-        'min_stock' => 'integer',
-        'safety_stock' => 'integer',
+        'qty' => 'float',
+        'min_stock' => 'float',
+        'safety_stock' => 'float',
         'version' => 'integer',
         'synced_at' => 'datetime',
     ];

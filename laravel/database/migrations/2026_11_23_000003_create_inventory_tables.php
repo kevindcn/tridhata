@@ -16,9 +16,9 @@ return new class extends Migration
             $table->foreignId('item_id')->nullable()->constrained('items')->cascadeOnDelete();
             $table->foreignId('product_id')->nullable()->constrained('products')->cascadeOnDelete();
             $table->foreignId('location_id')->constrained('locations')->cascadeOnDelete();
-            $table->integer('qty')->default(0);
-            $table->integer('min_stock')->default(0);
-            $table->integer('safety_stock')->default(0);
+            $table->decimal('qty', 18, 4)->default(0);
+            $table->decimal('min_stock', 18, 4)->default(0);
+            $table->decimal('safety_stock', 18, 4)->default(0);
             $table->timestamp('synced_at')->nullable();
             $table->integer('version')->default(1);
             $table->timestamps();
