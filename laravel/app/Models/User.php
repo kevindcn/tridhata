@@ -118,4 +118,12 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->hasMany(StockOpname::class, 'created_by');
     }
+
+    /**
+     * Letters created by this user.
+     */
+    public function letters(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Letter::class, 'created_by');
+    }
 }

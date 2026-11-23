@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('letter_number')->unique();
             $table->string('type'); // SURAT_MASUK, SURAT_KELUAR, SK, TUGAS, etc.
             $table->string('direction'); // IN, OUT
+            $table->foreignId('location_id')->nullable()->constrained('locations')->nullOnDelete();
+            $table->string('branch')->nullable();
             $table->string('subject');
             $table->string('sender')->nullable();
             $table->string('recipient')->nullable();
@@ -27,6 +29,8 @@ return new class extends Migration
 
             $table->index(['direction', 'date']);
             $table->index('letter_number');
+            $table->index('location_id');
+            $table->index('branch');
         });
     }
 

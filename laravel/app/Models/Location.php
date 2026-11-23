@@ -89,4 +89,12 @@ class Location extends Model
     {
         return $this->hasMany(StockOpname::class, 'location_id');
     }
+
+    /**
+     * Letters archived for this location.
+     */
+    public function letters(): HasMany
+    {
+        return $this->hasMany(Letter::class, 'location_id');
+    }
 }
