@@ -73,4 +73,12 @@ class Location extends Model
     {
         return $this->hasMany(Delivery::class, 'location_id');
     }
+
+    /**
+     * Attendances recorded at this location.
+     */
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(Attendance::class, 'location_id');
+    }
 }

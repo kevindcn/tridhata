@@ -102,4 +102,12 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->hasMany(ProductionLog::class, 'created_by');
     }
+
+    /**
+     * Attendances recorded by this user.
+     */
+    public function attendances(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Attendance::class);
+    }
 }
