@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockLevel;
 use App\Models\StockMovement;
+use App\Models\StockOpname;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -257,6 +258,84 @@ class InventoryService
             ->where('location_id', $locationId)
             ->whereRaw('qty <= min_stock')
             ->get();
+    }
+
+    /**
+     * Applies a verified Stock Opname by creating an ADJUSTMENT StockMovement
+     * and aligning actual StockLevels to counted quantities.
+     *
+     * @param StockOpname $opname
+     * @return StockMovement
+     */
+    public function applyStockOpname(StockOpname $opname): StockMovement
+    {
+        return DB::transaction(function () use ($opname) {
+            $opname->loadMissing(['items.item', 'items.product']);
+
+            $userId = auth()->id() ?? $opname->created_by;
+            $movementCode = $this->generateMovementCode(StockMovementType::ADJUSTMENT);
+
+            $movement = StockMovement::create([
+                'code' => $movementCode,
+                'type' => StockMovementType::ADJUSTMENT,
+                'location_id' => $opname->location_id,
+                'target_location_id' => null,
+                'reference_type' => StockOpname::class,
+                'reference_id' => $opname->id,
+                'date' => now()->toDateString(),
+                'notes' => "Penyesuaian stok dari hasil Stock Opname {$opname->code}",
+                'status' => 'COMPLETED',
+                'created_by' => $userId,
+            ]);
+
+            foreach ($opname->items as $opnameItem) {
+                $stockLevel = StockLevel::where('location_id', $opname->location_id)
+                    ->when($opnameItem->item_id, fn ($q) => $q->where('item_id', $opnameItem->item_id))
+                    ->when($opnameItem->product_id, fn ($q) => $q->where('product_id', $opnameItem->product_id))
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $stockLevel) {
+                    $stockLevel = StockLevel::create([
+                        'location_id' => $opname->location_id,
+                        'item_id' => $opnameItem->item_id,
+                        'product_id' => $opnameItem->product_id,
+                        'qty' => 0,
+                        'version' => 1,
+                    ]);
+                }
+
+                // Align stock level directly to counted_qty
+                $stockLevel->qty = round((float) $opnameItem->counted_qty, 4);
+                $stockLevel->version += 1;
+                $stockLevel->synced_at = now();
+                $stockLevel->save();
+
+                $movement->items()->create([
+                    'item_id' => $opnameItem->item_id,
+                    'product_id' => $opnameItem->product_id,
+                    'qty' => (float) $opnameItem->counted_qty,
+                    'unit' => $opnameItem->item?->unit ?? 'pcs',
+                    'unit_price' => 0,
+                    'total_price' => 0,
+                ]);
+            }
+
+            $opname->update(['status' => 'APPLIED']);
+
+            activity('inventory')
+                ->performedOn($movement)
+                ->causedBy(auth()->user() ?? $opname->creator)
+                ->withProperties([
+                    'code' => $movement->code,
+                    'type' => StockMovementType::ADJUSTMENT->value,
+                    'stock_opname_id' => $opname->id,
+                    'items_count' => $opname->items->count(),
+                ])
+                ->log("Stock Opname applied: {$opname->code} with adjustment {$movement->code}");
+
+            return $movement->loadMissing(['items.item', 'items.product', 'location', 'creator']);
+        });
     }
 
     /**

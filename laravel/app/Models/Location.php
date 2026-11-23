@@ -81,4 +81,12 @@ class Location extends Model
     {
         return $this->hasMany(Attendance::class, 'location_id');
     }
+
+    /**
+     * Stock opnames conducted at this location.
+     */
+    public function stockOpnames(): HasMany
+    {
+        return $this->hasMany(StockOpname::class, 'location_id');
+    }
 }
