@@ -167,6 +167,10 @@ class StockOpnameOcrTest extends TestCase
         // Status should be set to VERIFIED
         $this->assertEquals('VERIFIED', $opname->status);
 
+        // Verify crop_boxes integration created and persisted cropped_photo_path
+        $this->assertNotNull($opname->cropped_photo_path);
+        $this->assertTrue(Storage::disk('public')->exists($opname->cropped_photo_path));
+
         // Check first item: counted 25, system 20, variance 5, confidence 0.94, flagged_manual false
         $this->assertDatabaseHas('stock_opname_items', [
             'stock_opname_id' => $opname->id,
@@ -241,6 +245,10 @@ class StockOpnameOcrTest extends TestCase
         // Assert StockLevel quantities are aligned to counted_qty
         $this->assertEquals(25, $stockLevel1->fresh()->qty);
         $this->assertEquals(8, $stockLevel2->fresh()->qty);
+
+        // Assert movement line items record adjustment delta abs(variance)
+        $this->assertEquals(5, (float) $movement->items->firstWhere('item_id', $item1->id)->qty);
+        $this->assertEquals(2, (float) $movement->items->firstWhere('item_id', $item2->id)->qty);
 
         // Assert Opname status updated to APPLIED
         $this->assertEquals('APPLIED', $opname->fresh()->status);
@@ -337,17 +345,73 @@ class StockOpnameOcrTest extends TestCase
             ->assertFileDownloaded();
     }
 
-    public function test_job_handles_photo_with_fallback_when_no_mock_file(): void
+    public function test_unauthorized_user_gets_403_on_verification_page(): void
     {
-        $location = Location::factory()->create();
-        $item1 = Item::factory()->create(['sku' => 'SKU-FALLBACK-1']);
-        $item2 = Item::factory()->create(['sku' => 'SKU-FALLBACK-2']);
+        $locAllowed = Location::factory()->create(['name' => 'Lokasi Diizinkan']);
+        $locForbidden = Location::factory()->create(['name' => 'Lokasi Terlarang']);
 
-        $photoPath = 'opnames/non_mock_form.jpg';
-        Storage::disk('public')->put($photoPath, 'binary-image-data-without-sidecar');
+        $user = User::factory()->create(['default_location_id' => $locAllowed->id]);
+        $user->locations()->attach($locAllowed->id);
+        $this->actingAs($user);
 
         $opname = StockOpname::create([
-            'code' => 'SO-FALLBACK-001',
+            'code' => 'SO-FORBIDDEN-001',
+            'location_id' => $locForbidden->id,
+            'date' => now()->toDateString(),
+            'status' => 'VERIFIED',
+        ]);
+
+        Livewire::test(StockOpnameVerificationPage::class, ['record' => $opname->id])
+            ->assertForbidden();
+    }
+
+    public function test_failed_ocr_sets_status_to_ocr_failed_without_creating_fake_items(): void
+    {
+        $location = Location::factory()->create();
+        $item1 = Item::factory()->create(['sku' => 'REAL-ITEM-1']);
+
+        // An unreadable/corrupt image without any companion json or recognizable digit data
+        $photoPath = 'opnames/unreadable_form.jpg';
+        Storage::disk('public')->put($photoPath, 'corrupted-binary-noise');
+
+        $opname = StockOpname::create([
+            'code' => 'SO-FAILED-001',
+            'location_id' => $location->id,
+            'date' => now()->toDateString(),
+            'status' => 'DRAFT',
+            'form_photo_path' => $photoPath,
+        ]);
+
+        $job = new ProcessStockOpnameOcrJob($opname);
+        $job->handle();
+
+        $opname->refresh();
+        $this->assertEquals('OCR_FAILED', $opname->status);
+        $this->assertEquals(0, $opname->items()->count());
+        $this->assertStringContainsString('Gagal', (string) $opname->notes);
+    }
+
+    public function test_crop_boxes_integration_and_cropped_photo_path_persistence(): void
+    {
+        $location = Location::factory()->create();
+        $item = Item::factory()->create(['sku' => 'SKU-CROP-1']);
+
+        $photoPath = 'opnames/form_to_crop.jpg';
+        Storage::disk('public')->put($photoPath, 'raw-photo-bytes');
+
+        $mockJson = json_encode([
+            [
+                'row' => 1,
+                'item_id' => $item->id,
+                'digits' => '0050',
+                'confidence' => 0.95,
+                'flagged_manual' => false,
+            ],
+        ]);
+        Storage::disk('public')->put($photoPath . '.json', $mockJson);
+
+        $opname = StockOpname::create([
+            'code' => 'SO-CROP-001',
             'location_id' => $location->id,
             'date' => now()->toDateString(),
             'status' => 'DRAFT',
@@ -359,6 +423,8 @@ class StockOpnameOcrTest extends TestCase
 
         $opname->refresh();
         $this->assertEquals('VERIFIED', $opname->status);
-        $this->assertGreaterThan(0, $opname->items()->count());
+        $this->assertNotNull($opname->cropped_photo_path);
+        $this->assertEquals("opnames/cropped/{$opname->id}.jpg", $opname->cropped_photo_path);
+        $this->assertTrue(Storage::disk('public')->exists($opname->cropped_photo_path));
     }
 }

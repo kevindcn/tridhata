@@ -93,10 +93,11 @@ class StockOpnameResource extends Resource
                         Forms\Components\Select::make('status')
                             ->label('Status')
                             ->options([
-                                'DRAFT' => 'Draft',
+                                'DRAFT' => 'Draf',
                                 'OCR_PROCESSING' => 'Sedang Diproses OCR',
                                 'VERIFIED' => 'Terverifikasi (Siap Terapkan)',
                                 'APPLIED' => 'Selesai Diterapkan',
+                                'OCR_FAILED' => 'Gagal OCR',
                             ])
                             ->default('DRAFT')
                             ->required(),
@@ -134,11 +135,20 @@ class StockOpnameResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'DRAFT' => 'Draf',
+                        'OCR_PROCESSING' => 'Sedang Diproses OCR',
+                        'VERIFIED' => 'Terverifikasi',
+                        'APPLIED' => 'Selesai Diterapkan',
+                        'OCR_FAILED' => 'Gagal OCR',
+                        default => $state,
+                    })
                     ->color(fn (string $state): string => match ($state) {
                         'DRAFT' => 'gray',
                         'OCR_PROCESSING' => 'warning',
                         'VERIFIED' => 'info',
                         'APPLIED' => 'success',
+                        'OCR_FAILED' => 'danger',
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('total_variance')
@@ -158,10 +168,11 @@ class StockOpnameResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status')
                     ->options([
-                        'DRAFT' => 'Draft',
-                        'OCR_PROCESSING' => 'OCR Processing',
-                        'VERIFIED' => 'Verified',
-                        'APPLIED' => 'Applied',
+                        'DRAFT' => 'Draf',
+                        'OCR_PROCESSING' => 'Sedang Diproses OCR',
+                        'VERIFIED' => 'Terverifikasi',
+                        'APPLIED' => 'Selesai Diterapkan',
+                        'OCR_FAILED' => 'Gagal OCR',
                     ]),
                 Tables\Filters\SelectFilter::make('location_id')
                     ->label('Cabang')

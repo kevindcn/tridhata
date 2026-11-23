@@ -11,6 +11,7 @@ import sys
 import os
 import argparse
 import json
+import shutil
 
 try:
     import cv2
@@ -77,7 +78,6 @@ def detect_corner_markers(image_path, target_width=2000, target_height=2800):
 
         # Need at least 4 markers
         if len(candidates) >= 4:
-            # Find the 4 points closest to the corners of the image
             corners = [(0, 0), (orig_w, 0), (orig_w, orig_h), (0, orig_h)]
             best_pts = []
             for cx, cy in corners:
@@ -103,16 +103,35 @@ def detect_corner_markers(image_path, target_width=2000, target_height=2800):
 
 def main():
     parser = argparse.ArgumentParser(description="Crop and warp stock opname form")
-    parser.add_argument("--image", required=True, help="Input image path")
+    parser.add_argument("--input", "--image", dest="image", required=True, help="Input image path")
     parser.add_argument("--output", required=False, help="Output warped image path")
+    parser.add_argument("--output-dir", required=False, help="Output directory for cropped images")
+    parser.add_argument("--opname-id", required=False, help="Opname ID for naming")
     args = parser.parse_args()
 
-    warped = detect_corner_markers(args.image)
-    if warped is not None and args.output and HAVE_CV2:
-        cv2.imwrite(args.output, warped)
-        print(json.dumps({"status": "success", "output": args.output}))
+    input_path = os.path.abspath(args.image)
+    output_path = None
+
+    if args.output:
+        output_path = os.path.abspath(args.output)
+    elif args.output_dir:
+        os.makedirs(args.output_dir, exist_ok=True)
+        filename = f"{args.opname_id}.jpg" if args.opname_id else os.path.basename(input_path)
+        output_path = os.path.abspath(os.path.join(args.output_dir, filename))
+
+    if output_path:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    warped = detect_corner_markers(input_path)
+    if warped is not None and output_path and HAVE_CV2:
+        cv2.imwrite(output_path, warped)
+        print(json.dumps({"status": "success", "output": output_path, "straightened": True}))
+    elif output_path and os.path.exists(input_path):
+        # Fallback copy for environments without OpenCV or synthetic fixtures
+        shutil.copy2(input_path, output_path)
+        print(json.dumps({"status": "success", "output": output_path, "straightened": False}))
     else:
-        print(json.dumps({"status": "skipped", "reason": "No cv2 or markers not resolved"}))
+        print(json.dumps({"status": "skipped", "reason": "No output path or input missing"}))
 
 
 if __name__ == "__main__":

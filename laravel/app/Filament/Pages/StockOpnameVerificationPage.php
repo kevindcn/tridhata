@@ -43,8 +43,35 @@ class StockOpnameVerificationPage extends Page
             ])->find($opnameId);
 
             if ($this->stockOpname) {
+                $this->authorizeAccess();
                 $this->loadItems();
             }
+        }
+    }
+
+    protected function authorizeAccess(): void
+    {
+        $user = auth()->user();
+        if (! $user) {
+            abort(403, 'Anda tidak memiliki hak akses ke cabang ini.');
+        }
+
+        if (method_exists($user, 'hasRole') && $user->hasRole('super_admin')) {
+            return;
+        }
+
+        if (! $this->stockOpname) {
+            return;
+        }
+
+        $locationIds = $user->locations()->pluck('locations.id')->all();
+        if ($user->default_location_id) {
+            $locationIds[] = $user->default_location_id;
+        }
+        $locationIds = array_unique(array_filter($locationIds));
+
+        if (! in_array($this->stockOpname->location_id, $locationIds)) {
+            abort(403, 'Anda tidak memiliki hak akses ke cabang ini.');
         }
     }
 
@@ -68,6 +95,8 @@ class StockOpnameVerificationPage extends Page
 
     public function updateItemCount(int $index, int $newCount): void
     {
+        $this->authorizeAccess();
+
         if (isset($this->items[$index])) {
             $this->items[$index]['counted_qty'] = $newCount;
             $this->items[$index]['variance'] = $newCount - $this->items[$index]['system_qty'];
@@ -87,6 +116,8 @@ class StockOpnameVerificationPage extends Page
 
     public function applyOpname(): void
     {
+        $this->authorizeAccess();
+
         if (! $this->stockOpname) {
             Notification::make()->title('Data opname tidak ditemukan')->danger()->send();
             return;

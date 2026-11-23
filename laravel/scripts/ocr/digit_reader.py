@@ -28,7 +28,7 @@ except ImportError:
     HAVE_PADDLEOCR = False
 
 
-def run_paddle_ocr(image_path):
+def run_paddle_ocr(image_path, raw_image_path=None):
     """
     Performs full OCR recognition using PaddleOCR when available.
     """
@@ -37,7 +37,7 @@ def run_paddle_ocr(image_path):
     ocr_result = ocr.ocr(image_path, cls=True)
 
     if not ocr_result or not ocr_result[0]:
-        return fallback_deterministic_reader(image_path)
+        return fallback_deterministic_reader(image_path, raw_image_path)
 
     row_idx = 1
     for line in ocr_result[0]:
@@ -54,38 +54,38 @@ def run_paddle_ocr(image_path):
             })
             row_idx += 1
 
-    return results if results else fallback_deterministic_reader(image_path)
+    return results if results else fallback_deterministic_reader(image_path, raw_image_path)
 
 
-def fallback_deterministic_reader(image_path):
+def fallback_deterministic_reader(image_path, raw_image_path=None):
     """
     Deterministic OCR parser fallback:
-    1. Checks if companion JSON file exists (<image>.json or <image_without_ext>.json)
-    2. Checks if image file itself contains readable JSON
-    3. Checks environment variable OCR_MOCK_DATA
-    4. Deterministic synthetic default rows for testing & verification.
+    1. Checks companion JSON file for image_path (<image>.json or <base>.json)
+    2. Checks companion JSON file for raw_image_path if provided
+    3. Checks if image file itself contains readable JSON
+    4. Checks environment variable OCR_MOCK_DATA
+    5. Returns empty list if no valid data is discovered (prevents phantom inventory records)
     """
-    # 1. Companion JSON file
-    companion_json = image_path + ".json"
-    if os.path.exists(companion_json):
-        try:
-            with open(companion_json, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return normalize_ocr_results(data)
-        except Exception:
-            pass
+    candidates = [
+        image_path + ".json",
+        os.path.splitext(image_path)[0] + ".json",
+    ]
+    if raw_image_path:
+        candidates.extend([
+            raw_image_path + ".json",
+            os.path.splitext(raw_image_path)[0] + ".json",
+        ])
 
-    base_no_ext, _ = os.path.splitext(image_path)
-    base_json = base_no_ext + ".json"
-    if os.path.exists(base_json):
-        try:
-            with open(base_json, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return normalize_ocr_results(data)
-        except Exception:
-            pass
+    for json_file in candidates:
+        if json_file and os.path.exists(json_file):
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return normalize_ocr_results(data)
+            except Exception:
+                pass
 
-    # 2. Check if the image file itself is formatted as JSON (e.g. test fixture)
+    # Check if the image file itself is formatted as JSON (e.g. test fixture)
     if os.path.exists(image_path):
         try:
             with open(image_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -96,7 +96,7 @@ def fallback_deterministic_reader(image_path):
         except Exception:
             pass
 
-    # 3. Environment variable fallback
+    # Environment variable fallback
     env_mock = os.environ.get("OCR_MOCK_DATA")
     if env_mock:
         try:
@@ -105,14 +105,8 @@ def fallback_deterministic_reader(image_path):
         except Exception:
             pass
 
-    # 4. Deterministic default synthetic response
-    default_rows = [
-        {"row": 1, "item_id": 1, "digits": "0025", "confidence": 0.94, "flagged_manual": False},
-        {"row": 2, "item_id": 2, "digits": "0010", "confidence": 0.91, "flagged_manual": False},
-        {"row": 3, "item_id": 3, "digits": "0008", "confidence": 0.65, "flagged_manual": True},
-        {"row": 4, "item_id": 4, "digits": "0100", "confidence": 0.98, "flagged_manual": False},
-    ]
-    return normalize_ocr_results(default_rows)
+    # No valid data recognized - return empty list so pipeline marks OCR_FAILED
+    return []
 
 
 def normalize_ocr_results(data):
@@ -141,18 +135,20 @@ def normalize_ocr_results(data):
 def main():
     parser = argparse.ArgumentParser(description="Read digit boxes from opname form")
     parser.add_argument("--image", required=True, help="Path to form image")
+    parser.add_argument("--raw-image", required=False, help="Path to original raw form image")
     parser.add_argument("--output", required=False, help="Path to output JSON file")
     args = parser.parse_args()
 
     image_path = os.path.abspath(args.image)
+    raw_image_path = os.path.abspath(args.raw_image) if args.raw_image else None
 
     if HAVE_CV2 and HAVE_PADDLEOCR and os.path.exists(image_path):
         try:
-            results = run_paddle_ocr(image_path)
+            results = run_paddle_ocr(image_path, raw_image_path)
         except Exception:
-            results = fallback_deterministic_reader(image_path)
+            results = fallback_deterministic_reader(image_path, raw_image_path)
     else:
-        results = fallback_deterministic_reader(image_path)
+        results = fallback_deterministic_reader(image_path, raw_image_path)
 
     json_output = json.dumps(results, indent=2)
 

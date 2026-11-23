@@ -314,7 +314,7 @@ class InventoryService
                 $movement->items()->create([
                     'item_id' => $opnameItem->item_id,
                     'product_id' => $opnameItem->product_id,
-                    'qty' => (float) $opnameItem->counted_qty,
+                    'qty' => (float) abs($opnameItem->variance),
                     'unit' => $opnameItem->item?->unit ?? 'pcs',
                     'unit_price' => 0,
                     'total_price' => 0,

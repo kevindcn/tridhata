@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Item;
+use App\Models\Product;
 use App\Models\StockLevel;
 use App\Models\StockOpname;
 use Illuminate\Bus\Queueable;
@@ -22,92 +24,105 @@ class ProcessStockOpnameOcrJob implements ShouldQueue
 
     public function handle(): void
     {
-        // 1. Mark as processing
+        // 1. Mark status as OCR_PROCESSING
         $this->stockOpname->update(['status' => 'OCR_PROCESSING']);
 
-        // 2. Resolve image path
+        // 2. Resolve raw photo path
         $photoPath = $this->stockOpname->form_photo_path;
-        $fullPath = null;
+        $fullRawPath = null;
         if ($photoPath && Storage::disk('public')->exists($photoPath)) {
-            $fullPath = Storage::disk('public')->path($photoPath);
+            $fullRawPath = Storage::disk('public')->path($photoPath);
         } elseif ($photoPath && file_exists($photoPath)) {
-            $fullPath = $photoPath;
+            $fullRawPath = $photoPath;
         } elseif ($photoPath) {
-            $fullPath = storage_path('app/public/' . $photoPath);
+            $fullRawPath = storage_path('app/public/' . $photoPath);
         }
+
+        if (! $fullRawPath || ! file_exists($fullRawPath)) {
+            $this->stockOpname->update([
+                'status' => 'OCR_FAILED',
+                'notes' => 'File foto formulir opname tidak ditemukan di penyimpanan.',
+            ]);
+            return;
+        }
+
+        $pythonBinary = config('services.ocr.python_path', env('PYTHON_BINARY', 'python'));
+        $cropScriptPath = base_path('scripts/ocr/crop_boxes.py');
+        $digitScriptPath = base_path('scripts/ocr/digit_reader.py');
+
+        // 3. Step 1: Crop and straighten form using crop_boxes.py
+        $croppedRelativeDir = 'opnames/cropped';
+        Storage::disk('public')->makeDirectory($croppedRelativeDir);
+        $croppedRelativePath = "{$croppedRelativeDir}/{$this->stockOpname->id}.jpg";
+        $fullCroppedPath = Storage::disk('public')->path($croppedRelativePath);
+
+        $processCrop = new Process([
+            $pythonBinary,
+            $cropScriptPath,
+            '--input', $fullRawPath,
+            '--output', $fullCroppedPath,
+            '--opname-id', (string) $this->stockOpname->id,
+        ]);
+        $processCrop->setTimeout(60);
+        $processCrop->run();
+
+        // Update cropped_photo_path if generated
+        $targetOcrPath = $fullRawPath;
+        if (file_exists($fullCroppedPath)) {
+            $this->stockOpname->update(['cropped_photo_path' => $croppedRelativePath]);
+            $targetOcrPath = $fullCroppedPath;
+        }
+
+        // 4. Step 2: Read digit sequences via digit_reader.py
+        $processOcr = new Process([
+            $pythonBinary,
+            $digitScriptPath,
+            '--image', $targetOcrPath,
+            '--raw-image', $fullRawPath,
+        ]);
+        $processOcr->setTimeout(60);
+        $processOcr->run();
 
         $rows = [];
-
-        // 3. Invoke Python OCR digit reader script
-        if ($fullPath && file_exists($fullPath)) {
-            $pythonBinary = config('services.ocr.python_path', env('PYTHON_BINARY', 'python'));
-            $scriptPath = base_path('scripts/ocr/digit_reader.py');
-
-            $process = new Process([$pythonBinary, $scriptPath, '--image', $fullPath]);
-            $process->setTimeout(60);
-            $process->run();
-
-            if ($process->isSuccessful()) {
-                $output = trim($process->getOutput());
-                $startPos = strpos($output, '[');
-                $endPos = strrpos($output, ']');
-                if ($startPos !== false && $endPos !== false) {
-                    $jsonStr = substr($output, $startPos, $endPos - $startPos + 1);
-                    $rows = json_decode($jsonStr, true) ?? [];
-                }
-            }
-
-            // Fallback to companion json if process output was empty or failed
-            if (empty($rows)) {
-                $companionJson = $fullPath . '.json';
-                if (file_exists($companionJson)) {
-                    $rows = json_decode((string) file_get_contents($companionJson), true) ?? [];
-                }
+        if ($processOcr->isSuccessful()) {
+            $output = trim($processOcr->getOutput());
+            $startPos = strpos($output, '[');
+            $endPos = strrpos($output, ']');
+            if ($startPos !== false && $endPos !== false) {
+                $jsonStr = substr($output, $startPos, $endPos - $startPos + 1);
+                $rows = json_decode($jsonStr, true) ?? [];
             }
         }
 
-        // Default synthetic fallback if rows could not be retrieved
+        // If Python output is empty, check companion json for test fixtures
         if (empty($rows)) {
-            $existingItems = $this->stockOpname->items;
-            if ($existingItems->isNotEmpty()) {
-                foreach ($existingItems as $idx => $exItem) {
-                    $rows[] = [
-                        'row' => $idx + 1,
-                        'item_id' => $exItem->item_id,
-                        'product_id' => $exItem->product_id,
-                        'digits' => str_pad((string) $exItem->system_qty, 4, '0', STR_PAD_LEFT),
-                        'confidence' => 0.95,
-                        'flagged_manual' => false,
-                    ];
-                }
-            } else {
-                $rows = [
-                    ['row' => 1, 'item_id' => 1, 'digits' => '0025', 'confidence' => 0.94, 'flagged_manual' => false],
-                    ['row' => 2, 'item_id' => 2, 'digits' => '0008', 'confidence' => 0.65, 'flagged_manual' => true],
-                ];
+            $companionJson = $fullRawPath . '.json';
+            if (file_exists($companionJson)) {
+                $rows = json_decode((string) file_get_contents($companionJson), true) ?? [];
             }
         }
 
-        // 4. Populate stock_opname_items
+        // 5. Fail gracefully if no valid OCR data produced (No phantom data fabrication)
+        if (empty($rows)) {
+            $this->stockOpname->update([
+                'status' => 'OCR_FAILED',
+                'notes' => 'Gagal membaca digit dari foto formulir.',
+            ]);
+            return;
+        }
+
+        // 6. Populate stock_opname_items for verified items only
+        $itemsPopulated = 0;
         foreach ($rows as $row) {
             $rawItemId = ! empty($row['item_id']) ? (int) $row['item_id'] : null;
             $rawProductId = ! empty($row['product_id']) ? (int) $row['product_id'] : null;
 
-            $itemId = ($rawItemId && \App\Models\Item::where('id', $rawItemId)->exists()) ? $rawItemId : null;
-            $productId = ($rawProductId && \App\Models\Product::where('id', $rawProductId)->exists()) ? $rawProductId : null;
+            $itemId = ($rawItemId && Item::where('id', $rawItemId)->exists()) ? $rawItemId : null;
+            $productId = ($rawProductId && Product::where('id', $rawProductId)->exists()) ? $rawProductId : null;
 
-            // If neither matches, attempt to fallback to existing opname item or available item
+            // Strict guard: skip row if item does not exist in master records
             if (! $itemId && ! $productId) {
-                $existingFallback = $this->stockOpname->items()->skip(($row['row'] ?? 1) - 1)->first();
-                if ($existingFallback) {
-                    $itemId = $existingFallback->item_id;
-                    $productId = $existingFallback->product_id;
-                } else {
-                    $availableItem = \App\Models\Item::first();
-                    if ($availableItem) {
-                        $itemId = $availableItem->id;
-                    }
-                }
+                continue;
             }
 
             $digits = (string) ($row['digits'] ?? '0');
@@ -127,7 +142,7 @@ class ProcessStockOpnameOcrJob implements ShouldQueue
                     ->value('qty') ?? 0);
             }
 
-            // Check if item already exists in this opname with a designated system_qty
+            // Check if item already exists in this opname with an established system_qty
             $existingItem = $this->stockOpname->items()
                 ->when($itemId, fn ($q) => $q->where('item_id', $itemId))
                 ->when($productId, fn ($q) => $q->where('product_id', $productId))
@@ -152,9 +167,20 @@ class ProcessStockOpnameOcrJob implements ShouldQueue
                     'flagged_manual' => $flaggedManual,
                 ]
             );
+
+            $itemsPopulated++;
         }
 
-        // 5. Update total_variance & status to VERIFIED
+        // If no matching valid items were populated, mark as OCR_FAILED
+        if ($itemsPopulated === 0) {
+            $this->stockOpname->update([
+                'status' => 'OCR_FAILED',
+                'notes' => 'Gagal membaca digit dari foto formulir.',
+            ]);
+            return;
+        }
+
+        // 7. Update total_variance & status to VERIFIED
         $totalVariance = (int) $this->stockOpname->items()->sum('variance');
 
         $this->stockOpname->update([
