@@ -94,4 +94,12 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->hasMany(Approval::class, 'approver_id');
     }
+
+    /**
+     * Production logs created by this user.
+     */
+    public function productionLogs(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ProductionLog::class, 'created_by');
+    }
 }

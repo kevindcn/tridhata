@@ -31,4 +31,9 @@ class Item extends Model
     {
         return $this->hasMany(RequestItem::class, 'item_id');
     }
+
+    public function bomItems(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BomItem::class, 'item_id');
+    }
 }

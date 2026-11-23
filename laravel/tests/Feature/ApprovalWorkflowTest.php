@@ -451,6 +451,7 @@ class ApprovalWorkflowTest extends TestCase
 
         $request = ErpRequest::factory()->create([
             'location_id' => $bogor->id,
+            'type' => 'OFFICE',
             'amount' => 1000000,
             'status' => 'PENDING',
             'current_approval_step' => 1,

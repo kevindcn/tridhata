@@ -41,4 +41,20 @@ class Location extends Model
     {
         return $this->hasMany(Request::class, 'location_id');
     }
+
+    /**
+     * Production teams in this location.
+     */
+    public function productionTeams(): HasMany
+    {
+        return $this->hasMany(ProductionTeam::class, 'location_id');
+    }
+
+    /**
+     * Production schedules in this location.
+     */
+    public function productionSchedules(): HasMany
+    {
+        return $this->hasMany(ProductionSchedule::class, 'location_id');
+    }
 }
